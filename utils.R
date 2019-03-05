@@ -1,0 +1,108 @@
+
+## nonzero function from the DAPAR package (https://rdrr.io/bioc/DAPAR/src/R/utils.R)
+nonzero <- function(x){
+    stopifnot(inherits(x, "dgCMatrix"))
+    if (all(x@p == 0))
+        return(matrix(0, nrow=0, ncol=2,
+                      dimnames=list(character(0), c("row","col"))))
+    res <- cbind(x@i+1, rep(seq(dim(x)[2]), diff(x@p)))
+    colnames(res) <- c("row", "col")
+    res <- res[x@x != 0, , drop = FALSE]
+    return(res)
+}
+
+### Helper functions not exported by CAGEfightR
+
+TCstats <- function(coverage_plus, coverage_minus, tcs_plus, tcs_minus) {
+                                        # Check classes
+    stopifnot(methods::is(coverage_plus, "SimpleRleList"),
+              methods::is(coverage_minus, "SimpleRleList"),
+              methods::is(tcs_plus, "CompressedIRangesList"),
+              methods::is(tcs_minus, "CompressedIRangesList"))
+
+                                        # Check seqlevels
+    stopifnot(length(unique(list(names(coverage_plus),
+                                 names(tcs_plus),
+                                 names(coverage_minus),
+                                 names(tcs_minus)))) == 1)
+
+                                        # Obtain views
+    views_plus <- Views(coverage_plus, tcs_plus)
+    views_minus <- Views(coverage_minus, tcs_minus)
+
+                                        # Calculate Sums
+    sum_plus <- unlist(viewSums(views_plus))
+    sum_minus <- unlist(viewSums(views_minus))
+
+                                        # Find peaks
+    ranges_plus <- viewRangeMaxs(views_plus)
+    ranges_minus <- viewRangeMaxs(views_minus)
+    ranges_plus <- resize(unlist(ranges_plus), width = 1, fix = "center")
+    ranges_minus <- resize(unlist(ranges_minus), width = 1, fix = "center")
+
+                                        # Merge into GRanges
+    TCs <- c(GRanges(tcs_plus,
+                     strand = "+",
+                     score = sum_plus,
+                     thick = ranges_plus),
+             GRanges(tcs_minus,
+                     strand = "-",
+                     score = sum_minus,
+                     thick = ranges_minus))
+
+                                        # Names as IDs for both ranges and peaks
+    TC_ids <- paste0(seqnames(TCs), ":", start(TCs), "-", end(TCs), ";", strand(TCs))
+    names(TCs) <- TC_ids
+    names(TCs$thick) <- TC_ids
+
+                                        # Return
+    TCs
+}
+
+summarizeWidths <- function(gr) {
+                                        # Checks
+    stopifnot(methods::is(gr, "GRanges"))
+
+                                        # Cut up widths
+    x <- cut(width(gr), breaks = c(1, 10, 100, 1000, Inf), labels = c(">=1", ">=10",
+                                                                      ">=100", ">=1000"), include.lowest = TRUE)
+
+                                        # Get freqs and props
+    y <- table(Width = x)
+    z <- prop.table(y)
+
+                                        # Format to data.frame
+    w <- merge(as.data.frame(y, responseName = "Count"),
+               as.data.frame(z, responseName = "Percent"))
+
+                                        # Add Total row
+    w <- rbind(data.frame(Width = "Total",
+                          Count = sum(w$Count),
+                          Percent = sum(w$Percent)), w)
+
+                                        # Reformat to percent
+    w$Percent <- paste0(format(w$Percent * 100, digits = 1), " %")
+
+                                        # To string and message
+    s <- paste(utils::capture.output(print(w, row.names = FALSE)), collapse = "\n")
+    message(s)
+    }
+
+splitByStrand <- function(object) {
+    split(object, strand(object))
+}
+
+splitPooled <- function(object){
+
+    ## Split by strand
+    o <- splitByStrand(object)
+
+    ## Calculate coverage
+    o <- lapply(o, coverage, weight="score")
+
+    ## Round to handle floating point errors
+    o <- lapply(o, round, digits=9)
+
+    ## Return
+    o
+}
