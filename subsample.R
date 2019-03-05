@@ -1,6 +1,8 @@
 require("CAGEfightR")
 require("assertthat")
 
+source("utils.R")
+
 ## Subsample a SummarizedExperiment to a target sequencing depth
 subsampleTarget <- function(object, inputAssay = "counts", target) {
 
@@ -46,17 +48,4 @@ subsampleProportion <- function(object, inputAssay = "counts", proportion) {
                                                       x=d, dimnames=list(rownames(a), colnames(a)[keep]))
     
     object
-}
-
-
-## nonzero function from the DAPAR package (https://rdrr.io/bioc/DAPAR/src/R/utils.R)
-nonzero <- function(x){
-    stopifnot(inherits(x, "dgCMatrix"))
-    if (all(x@p == 0))
-        return(matrix(0, nrow=0, ncol=2,
-                      dimnames=list(character(0), c("row","col"))))
-    res <- cbind(x@i+1, rep(seq(dim(x)[2]), diff(x@p)))
-    colnames(res) <- c("row", "col")
-    res <- res[x@x != 0, , drop = FALSE]
-    return(res)
 }
