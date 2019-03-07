@@ -2,7 +2,7 @@ require("CAGEfightR")
 require("assertthat")
 require("caTools")
 
-source("utils.R")
+source("CAGE_R/utils.R")
 
 ## Decomposes tag clusters according to pooled values and a decomposition function
 ## (implemented functions: summit_decompose and local_maxima_decompose)
