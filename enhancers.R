@@ -141,3 +141,24 @@ divergentLoci <- function(object, ctss, max_gap=400, win_size=200, inputAssay="c
     gr[divergent]
 }
 
+## loci: GRanges
+## ctss: RangedSummarisedExperiment
+quantifyDivergentLoci <- function(loci, ctss, inputAssay="counts") {
+    win_1 <- loci
+    end(win_1) <- start(loci$thick)-1
+    strand(win_1) <- "-"
+    
+    win_2 <- loci
+    end(win_2) <- start(loci$thick)-1
+    strand(win_2) <- "+"
+
+    m1 <- assay(quantifyClusters(ctss, win_1, inputAssay = inputAssay),inputAssay)
+    m2 <- assay(quantifyClusters(ctss, win_2, inputAssay = inputAssay),inputAssay)
+
+    o <- SummarizedExperiment(assays = SimpleList(m1+m2),
+                              rowRanges = loci,
+                              colData = colData(ctss))
+    assayNames(o) <- inputAssay
+    
+    o
+}
