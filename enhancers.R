@@ -128,11 +128,15 @@ divergentLoci <- function(object, ctss, max_gap=400, win_size=200, inputAssay="c
     start(gr) <- start(gr)-win_size
     end(gr) <- end(gr)+win_size
     gr$score <- M1+P2
-    gr$thick <- div_mid
-        
+    gr$thick <- IRanges(start=div_mid,width=1)
+    
     mcols(gr)[, "directionality"] <- pooled_directionality
     mcols(gr)[, "bidirectionality"] <- bidirectional
 
+    ids <- paste0(seqnames(gr), ":", start(gr), "-", end(gr))
+    names(gr) <- ids
+    names(gr$thick) <- ids
+    
     ## Remove non-divergent cases
     gr[divergent]
 }
