@@ -2,11 +2,8 @@ require("CAGEfightR")
 require("parallel")
 
 ## Object: GRanges
-## ctss: SummarizedExperiment
+## ctss: RangedSummarizedExperiment
 divergentLoci <- function(object, ctss, max_gap=400, win_size=200, inputAssay="counts") {
-
-    ctss <- methods::as(rowRanges(ctss),"GRanges")
-    assert_that(checkPooled(ctss))
 
     message("Removing overlapping TCs by strand...")
     ## Split on strand
@@ -52,7 +49,7 @@ divergentLoci <- function(object, ctss, max_gap=400, win_size=200, inputAssay="c
         c(s,e,round(mean(c(s,e))))
     }
 
-    chunks <- split(1:length(groups), ceiling(10*(1:length(groups))/length(groups)))
+    chunks <- split(1:length(groups), ceiling(100*(1:length(groups))/length(groups)))
     div_mid <- unlist(lapply(1:length(chunks), function(i) {
 
         r <- mclapply(groups[chunks[[i]]], function(g) {
@@ -83,15 +80,17 @@ divergentLoci <- function(object, ctss, max_gap=400, win_size=200, inputAssay="c
             
         m[3]
         },mc.cores=40)
-        cat(".")
+        cat("\r", i, "%")
         r
     }))
-        
-    div_chr <- sapply(groups, function(g) as.character(seqnames(object[names(con$membership[g])[1]])))
+    
+    ## Extract seqnames for loci
+    div_chr <- con$membership[match(1:length(groups),con$membership)]
+    div_chr <- as.character(sapply(names(div_chr), function(n) strsplit(n,":")[[1]][1]))
 
-    covByStrand <- splitPooled(ctss)
+    covByStrand <- splitPooled(rowRanges(ctss))
     gr <- GRanges(seqnames=div_chr,IRanges(start=div_mid,end=div_mid))
-    seqinfo(gr) <- seqinfo(ctss)
+    seqinfo(gr) <- seqinfo(rowRanges(ctss))
     
     message("Calculating directionality...")
 
