@@ -149,7 +149,7 @@ quantifyDivergentLoci <- function(loci, ctss, inputAssay="counts") {
     strand(win_1) <- "-"
     
     win_2 <- loci
-    end(win_2) <- start(loci$thick)-1
+    start(win_2) <- start(loci$thick)+1
     strand(win_2) <- "+"
 
     m1 <- assay(quantifyClusters(ctss, win_1, inputAssay = inputAssay),inputAssay)
