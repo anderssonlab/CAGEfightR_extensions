@@ -1,5 +1,6 @@
 require("CAGEfightR")
 require("parallel")
+source("utils")
 
 ## Object: GRanges
 ## ctss: RangedSummarizedExperiment
@@ -91,7 +92,8 @@ divergentLoci <- function(object, ctss, max_gap=400, win_size=200, inputAssay="c
     covByStrand <- splitPooled(rowRanges(ctss))
     gr <- GRanges(seqnames=div_chr,IRanges(start=div_mid,end=div_mid))
     seqinfo(gr) <- seqinfo(rowRanges(ctss))
-    
+
+    cat("\r")
     message("Calculating directionality...")
 
     win_1 <- flank(gr,width=win_size,start=TRUE,both=FALSE)
