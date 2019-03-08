@@ -1,6 +1,6 @@
 require("CAGEfightR")
 require("parallel")
-source("utils")
+source("CAGE_R/utils.R")
 
 ## Object: GRanges
 ## ctss: RangedSummarizedExperiment
@@ -80,7 +80,7 @@ divergentLoci <- function(object, ctss, max_gap=400, win_size=200, inputAssay="c
             }
             
         m[3]
-        },mc.cores=40)
+        },mc.cores=60)
         cat("\r", i, "%")
         r
     }))
@@ -89,9 +89,9 @@ divergentLoci <- function(object, ctss, max_gap=400, win_size=200, inputAssay="c
     div_chr <- con$membership[match(1:length(groups),con$membership)]
     div_chr <- as.character(sapply(names(div_chr), function(n) strsplit(n,":")[[1]][1]))
 
-    covByStrand <- splitPooled(rowRanges(ctss))
+    covByStrand <- splitPooled(methods::as(rowRanges(ctss),"GRanges"))
     gr <- GRanges(seqnames=div_chr,IRanges(start=div_mid,end=div_mid))
-    seqinfo(gr) <- seqinfo(rowRanges(ctss))
+    seqinfo(gr) <- seqinfo(ctss)
 
     cat("\r")
     message("Calculating directionality...")
