@@ -51,40 +51,41 @@ divergentLoci <- function(object, ctss, max_gap=400, win_size=200, inputAssay="c
 
         c(s,e,round(mean(c(s,e))))
     }
-        
-    div_mid <- sapply(1:length(groups), function(i) {
-        if (i %% (length(groups)/5) == 1)
-            message(round(100*i/length(groups)),"%")
-        g <- groups[[i]]
 
-        tcs <- splitByStrand(g)
-        m <- midpoint(tcs)
+    chunks <- split(1:length(groups), ceiling(10*(1:length(groups))/length(groups)))
+    div_mid <- unlist(lapply(1:length(chunks), function(i) {
 
-        ## conflict?
-        if (m[1] < m[2])
-        {
-            ends <- c(start(tcs$'-')[1], tail(end(tcs$'+'),1))
+        r <- mclapply(groups[chunks[[i]]], function(g) {
 
-            ## extend TCs to loci extremes
-            start(tcs$'-') <- ends[1]
-            end(tcs$'+') <- ends[2]
-
-            ## find overlaps between strands and prioritise by score
-            olaps <- as.matrix(findOverlaps(tcs$'-',tcs$'+',ignore.strand=TRUE))
-            ps <- tcs$'+'$score
-            ms <- tcs$'-'$score
-            rmm <- ms[olaps[,1]] < ps[olaps[,2]]
-            rmp <- !rmm
-            if (any(rmm))
-                tcs$'-' <- tcs$'-'[-olaps[rmm,1]]
-            if (any(rmp))
-                tcs$'+' <- tcs$'+'[-olaps[rmp,1]]
-            
+            tcs <- splitByStrand(g)
             m <- midpoint(tcs)
-        }
-
+            
+            ## conflict?
+            if (m[1] < m[2])
+            {
+                ## extend TCs to loci extremes
+                start(tcs$'-') <- start(tcs$'-')[1]
+                end(tcs$'+') <- tail(end(tcs$'+'),1)
+                
+                ## find overlaps between strands and prioritise by score
+                olaps <- findOverlaps(tcs$'-',tcs$'+',ignore.strand=TRUE)
+                ps <- tcs$'+'$score
+                ms <- tcs$'-'$score
+                rmm <- ms[queryHits(olaps)] < ps[subjectHits(olaps)]
+                rmp <- !rmm
+                if (any(rmm))
+                    tcs$'-' <- tcs$'-'[-queryHits(olaps)[rmm]]
+                if (any(rmp))
+                    tcs$'+' <- tcs$'+'[-subjectHits(olaps)[rmp]]
+                
+                m <- midpoint(tcs)
+            }
+            
         m[3]
-    })
+        },mc.cores=40)
+        cat(".")
+        r
+    }))
         
     div_chr <- sapply(groups, function(g) as.character(seqnames(object[names(con$membership[g])[1]])))
 
