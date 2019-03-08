@@ -1,9 +1,11 @@
 require("CAGEfightR")
+require("parallel")
 
 ## Object: GRanges
 ## ctss: SummarizedExperiment
 divergentLoci <- function(object, ctss, max_gap=400, win_size=200, inputAssay="counts") {
 
+    ctss <- methods::as(rowRanges(ctss),"GRanges")
     assert_that(checkPooled(ctss))
 
     message("Removing overlapping TCs by strand...")
@@ -34,66 +36,57 @@ divergentLoci <- function(object, ctss, max_gap=400, win_size=200, inputAssay="c
     con <- igraph::components(g)
 
     message("Merging into divergent loci...")
-    groups <- split(1:length(con$membership),con$membership)
+
+    ## Keep only relevant TCs
+    object <- object[names(con$membership)]
+
+    ## Split TCs by loci membership
+    groups <- split(object,con$membership)
+
     ## Merge connected components into divergent loci
 
-    div_loci <- bplapply(groups, function(g) {
-        tcs <- names(con$membership[g])
-        m_tcs <- TCsByStrand$'-'[tcs[grep(";-",tcs,fixed=TRUE)]]
-        p_tcs <- TCsByStrand$'+'[tcs[grep(";+",tcs,fixed=TRUE)]]
+    midpoint <- function(grl) {
+        s <- start(grl$'+')[1]
+        e <- tail(end(grl$'-'),1)
 
-        plen <- length(p_tcs)
-        mlen <- length(m_tcs)
-        pi <- 1
-        mi <- mlen
+        c(s,e,round(mean(c(s,e))))
+    }
         
-        #ms <- start(m_tcs[1])
-        me <- end(m_tcs)[mi]
-        ps <- start(p_tcs)[pi]
-        #pe <- end(p_tcs[plen])
+    div_mid <- sapply(1:length(groups), function(i) {
+        if (i %% (length(groups)/5) == 1)
+            message(round(100*i/length(groups)),"%")
+        g <- groups[[i]]
 
-        if (ps < me) {
-        
-            m_scores <- mcols(m_tcs)$score
-            p_scores <- mcols(p_tcs)$score
+        tcs <- splitByStrand(g)
+        m <- midpoint(tcs)
+
+        ## conflict?
+        if (m[1] < m[2])
+        {
+            ends <- c(start(tcs$'-')[1], tail(end(tcs$'+'),1))
+
+            ## extend TCs to loci extremes
+            start(tcs$'-') <- ends[1]
+            end(tcs$'+') <- ends[2]
+
+            ## find overlaps between strands and prioritise by score
+            olaps <- as.matrix(findOverlaps(tcs$'-',tcs$'+',ignore.strand=TRUE))
+            ps <- tcs$'+'$score
+            ms <- tcs$'-'$score
+            rmm <- ms[olaps[,1]] < ps[olaps[,2]]
+            rmp <- !rmm
+            if (any(rmm))
+                tcs$'-' <- tcs$'-'[-olaps[rmm,1]]
+            if (any(rmp))
+                tcs$'+' <- tcs$'+'[-olaps[rmp,1]]
             
-            ## Resolve conflicts
-            while (ps < me) {
-                mv <- m_scores[mi]
-                pv <- p_scores[pi]
-                
-                rm_p <- mv > pv || mlen == 1
-                rm_m <- pv >= mv || plen == 1
-                
-                if (rm_p && rm_m) {
-                    if (mlen==1) rm_m <- FALSE
-                    if (plen==1) rm_p <- FALSE
-                }
-                
-                ## Remove plus strand TC and update plus strand coordinates
-                if (rm_p) {
-                    pi <- pi+1
-                    plen <- plen-1
-                    ps <- start(p_tcs)[pi]
-                }
-                
-                ## Remove plus strand TC and update plus strand coordinates
-                if (rm_m) {
-                    mi <- mi-1
-                    mlen <- mlen-1
-                    me <- end(m_tcs)[mi]
-                }
-                
-                ## Should never happen
-                if (!rm_m && !rm_p) break
-            }
+            m <- midpoint(tcs)
         }
 
-        list(chr=as.character(seqnames(m_tcs)[1]),mid=round(mean(c(me,ps))))
+        m[3]
     })
-    
-    div_chr <- sapply(div_loci, function(x) x$chr)
-    div_mid <- sapply(div_loci, function(x) x$mid)
+        
+    div_chr <- sapply(groups, function(g) as.character(seqnames(object[names(con$membership[g])[1]])))
 
     covByStrand <- splitPooled(ctss)
     gr <- GRanges(seqnames=div_chr,IRanges(start=div_mid,end=div_mid))
