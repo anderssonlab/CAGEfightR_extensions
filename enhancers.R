@@ -32,63 +32,110 @@ divergentLoci <- function(object, ctss, max_gap=400, win_size=200, inputAssay="c
                      names(TCsByStrand$'+')[subjectHits(pairs)])
     g <- igraph::graph_from_edgelist(edge_list,directed=FALSE)
     con <- igraph::components(g)
-
-    message("Merging into divergent loci...")
-
+    
     ## Keep only relevant TCs
     object <- object[names(con$membership)]
-
-    ## Split TCs by loci membership
-    groups <- split(object,con$membership)
-
+    
+    message("Merging into divergent loci...")
+    
     ## Merge connected components into divergent loci
+    mergeLoci <- function(minus_pos, plus_pos, minus_score, plus_score)
+    {
+        m <- length(minus_pos)
+        p <- 1
 
-    midpoint <- function(grl) {
-        s <- start(grl$'+')[1]
-        e <- tail(end(grl$'-'),1)
+        while(minus_pos[m]>plus_pos[p]) {
 
-        c(s,e,round(mean(c(s,e))))
+            if (plus_score[p]<minus_score[m])
+                p <- p+1
+            else
+                m <- m-1
+        }
+        round(mean(c(minus_pos[m],plus_pos[p])))
     }
 
-    chunks <- split(1:length(groups), ceiling(100*(1:length(groups))/length(groups)))
-    div_mid <- unlist(lapply(1:length(chunks), function(i) {
+    df <- data.frame(strand=as.character(strand(object)),
+                     start=start(object),
+                     end=end(object),
+                     score=object$score,
+                     loci=con$membership,
+                     chunk=ceiling(100*con$membership/con$no),
+                     stringsAsFactors=FALSE)
 
-        r <- mclapply(groups[chunks[[i]]], function(g) {
+    ##div_mid <- unlist(lapply(1:100, function(i) {
+    
+    ##df_chunk <- subset(df, chunk == i)
+    
+    div_mid <- by(df, df$loci, function(d) {
+        d <- split(d,d$strand)
+        mergeLoci(d$'-'$end,d$'+'$start,d$'-'$score,d$'+'$score)
+    })
+        
+    ##cat("\r", i, "%")
+    ##r
+    ##}),use.names=FALSE)
 
-            tcs <- splitByStrand(g)
-            m <- midpoint(tcs)
+    ## ## Split TCs by loci membership
+    ## groups <- split(object,con$membership)
+
+    ##     midpoint <- function(grl) {
+    ##     s <- start(grl$'+')[1]
+    ##     e <- tail(end(grl$'-'),1)
+        
+    ##     c(s,e,round(mean(c(s,e))))
+    ## }
+
+    ## mergeLoci <- function(tcs) {
+
+    ##     ## extend TCs to loci extremes
+    ##     mtcs <- tcs$'-'
+    ##     ptcs <- tcs$'+'
+    ##     start(mtcs) <- start(mtcs)[1]
+    ##     end(ptcs) <- tail(end(ptcs),1)
+        
+    ##     ## find overlaps between strands and prioritise by score
+    ##     olaps <- findOverlaps(mtcs,ptcs,ignore.strand=TRUE)
+    ##     ps <- ptcs$score
+    ##     ms <- mtcs$score
+    ##     rmm <- ms[queryHits(olaps)] < ps[subjectHits(olaps)]
+    ##     rmp <- !rmm
+    ##     if (any(rmm))
+    ##         mtcs <- mtcs[-queryHits(olaps)[rmm]]
+    ##     if (any(rmp))
+    ##         ptcs <- ptcs[-subjectHits(olaps)[rmp]]
+
+    ##     o <- list(mtcs,ptcs)
+    ##     names(o) <- c("-","+")
+
+    ##     o
+    ## }
+    
+    ## chunks <- split(1:length(groups), ceiling(100*(1:length(groups))/length(groups)))[1]
+    ## div_mid <- unlist(lapply(1:length(chunks), function(i) {
+
+    ##     r <- mclapply(groups[chunks[[i]]], function(g) {
+
+    ##         tcs <- splitByStrand(g)
+    ##         m <- midpoint(tcs)
             
-            ## conflict?
-            if (m[1] < m[2])
-            {
-                ## extend TCs to loci extremes
-                start(tcs$'-') <- start(tcs$'-')[1]
-                end(tcs$'+') <- tail(end(tcs$'+'),1)
-                
-                ## find overlaps between strands and prioritise by score
-                olaps <- findOverlaps(tcs$'-',tcs$'+',ignore.strand=TRUE)
-                ps <- tcs$'+'$score
-                ms <- tcs$'-'$score
-                rmm <- ms[queryHits(olaps)] < ps[subjectHits(olaps)]
-                rmp <- !rmm
-                if (any(rmm))
-                    tcs$'-' <- tcs$'-'[-queryHits(olaps)[rmm]]
-                if (any(rmp))
-                    tcs$'+' <- tcs$'+'[-subjectHits(olaps)[rmp]]
-                
-                m <- midpoint(tcs)
-            }
+    ##         ## conflict?
+    ##         if (m[1] < m[2])
+    ##         {
+    ##             tcs <- mergeLoci(tcs)
+    ##             m <- midpoint(tcs)
+    ##         }
             
-        m[3]
-        },mc.cores=60)
-        cat("\r", i, "%")
-        r
-    }))
+    ##     m[3]
+    ##     },mc.cores=60)        
+        
+    ##     cat("\r", i, "%")
+    ##     r
+    ## }),use.names=FALSE)
     
     ## Extract seqnames for loci
-    div_chr <- con$membership[match(1:length(groups),con$membership)]
+    div_chr <- con$membership[match(1:con$no,con$membership)]
     div_chr <- as.character(sapply(names(div_chr), function(n) strsplit(n,":")[[1]][1]))
-
+    
     covByStrand <- splitPooled(methods::as(rowRanges(ctss),"GRanges"))
     gr <- GRanges(seqnames=div_chr,IRanges(start=div_mid,end=div_mid))
     seqinfo(gr) <- seqinfo(ctss)
@@ -110,7 +157,7 @@ divergentLoci <- function(object, ctss, max_gap=400, win_size=200, inputAssay="c
 
     ## Test if divergent
     divergent <- (M1>P1) & (P2>M2)
-
+    
     message("Calculating coverage across samples...")
 
     ## Quantify strand-wise in flanking windows around midpoint
