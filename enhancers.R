@@ -59,79 +59,13 @@ divergentLoci <- function(object, ctss, max_gap=400, win_size=200, inputAssay="c
                      end=end(object),
                      score=object$score,
                      loci=con$membership,
-                     chunk=ceiling(100*con$membership/con$no),
                      stringsAsFactors=FALSE)
-
-    ##div_mid <- unlist(lapply(1:100, function(i) {
-    
-    ##df_chunk <- subset(df, chunk == i)
     
     div_mid <- by(df, df$loci, function(d) {
         d <- split(d,d$strand)
         mergeLoci(d$'-'$end,d$'+'$start,d$'-'$score,d$'+'$score)
     })
-        
-    ##cat("\r", i, "%")
-    ##r
-    ##}),use.names=FALSE)
-
-    ## ## Split TCs by loci membership
-    ## groups <- split(object,con$membership)
-
-    ##     midpoint <- function(grl) {
-    ##     s <- start(grl$'+')[1]
-    ##     e <- tail(end(grl$'-'),1)
-        
-    ##     c(s,e,round(mean(c(s,e))))
-    ## }
-
-    ## mergeLoci <- function(tcs) {
-
-    ##     ## extend TCs to loci extremes
-    ##     mtcs <- tcs$'-'
-    ##     ptcs <- tcs$'+'
-    ##     start(mtcs) <- start(mtcs)[1]
-    ##     end(ptcs) <- tail(end(ptcs),1)
-        
-    ##     ## find overlaps between strands and prioritise by score
-    ##     olaps <- findOverlaps(mtcs,ptcs,ignore.strand=TRUE)
-    ##     ps <- ptcs$score
-    ##     ms <- mtcs$score
-    ##     rmm <- ms[queryHits(olaps)] < ps[subjectHits(olaps)]
-    ##     rmp <- !rmm
-    ##     if (any(rmm))
-    ##         mtcs <- mtcs[-queryHits(olaps)[rmm]]
-    ##     if (any(rmp))
-    ##         ptcs <- ptcs[-subjectHits(olaps)[rmp]]
-
-    ##     o <- list(mtcs,ptcs)
-    ##     names(o) <- c("-","+")
-
-    ##     o
-    ## }
-    
-    ## chunks <- split(1:length(groups), ceiling(100*(1:length(groups))/length(groups)))[1]
-    ## div_mid <- unlist(lapply(1:length(chunks), function(i) {
-
-    ##     r <- mclapply(groups[chunks[[i]]], function(g) {
-
-    ##         tcs <- splitByStrand(g)
-    ##         m <- midpoint(tcs)
             
-    ##         ## conflict?
-    ##         if (m[1] < m[2])
-    ##         {
-    ##             tcs <- mergeLoci(tcs)
-    ##             m <- midpoint(tcs)
-    ##         }
-            
-    ##     m[3]
-    ##     },mc.cores=60)        
-        
-    ##     cat("\r", i, "%")
-    ##     r
-    ## }),use.names=FALSE)
-    
     ## Extract seqnames for loci
     div_chr <- con$membership[match(1:con$no,con$membership)]
     div_chr <- as.character(sapply(names(div_chr), function(n) strsplit(n,":")[[1]][1]))
