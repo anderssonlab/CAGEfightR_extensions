@@ -1,6 +1,6 @@
 require("CAGEfightR")
 require("parallel")
-source("CAGE_R/utils.R")
+source("CAGEfightR_extensions/utils.R")
 
 ## Object: GRanges
 ## ctss: RangedSummarizedExperiment

@@ -1,7 +1,7 @@
 require("CAGEfightR")
 require("assertthat")
 
-source("CAGE_R/utils.R")
+source("CAGEfightR_extensions/utils.R")
 
 ## Subsample a SummarizedExperiment to a target sequencing depth
 subsampleTarget <- function(object, inputAssay = "counts", target) {
