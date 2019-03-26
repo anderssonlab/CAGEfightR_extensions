@@ -124,7 +124,7 @@ divergentLoci <- function(object, ctss, max_gap=400, win_size=200, inputAssay="c
 
 ## loci: GRanges
 ## ctss: RangedSummarisedExperiment
-quantifyDivergentLoci <- function(loci, ctss, inputAssay="counts") {
+quantifyStrandwiseDivergentLoci <- function(loci, ctss, inputAssay="counts") {
     win_1 <- loci
     end(win_1) <- start(loci$thick)-1
     strand(win_1) <- "-"
@@ -136,8 +136,29 @@ quantifyDivergentLoci <- function(loci, ctss, inputAssay="counts") {
     m1 <- assay(quantifyClusters(ctss, win_1, inputAssay = inputAssay),inputAssay)
     m2 <- assay(quantifyClusters(ctss, win_2, inputAssay = inputAssay),inputAssay)
 
-    o <- SummarizedExperiment(assays = SimpleList(m1+m2),
+	m <- SummarizedExperiment(assays = SimpleList(m1),
                               rowRanges = loci,
+                              colData = colData(ctss))
+    assayNames(m) <- inputAssay
+	p <- SummarizedExperiment(assays = SimpleList(m2),
+                              rowRanges = loci,
+                              colData = colData(ctss))
+    assayNames(p) <- inputAssay
+    
+	res <- list(m,p)
+	names(res) <- c("-","+")
+
+    res
+}
+
+## loci: GRanges
+## ctss: RangedSummarisedExperiment
+quantifyDivergentLoci <- function(loci, ctss, inputAssay="counts") {
+
+	res <- quantifyStrandwiseDivergentLoci(loci, ctss, inputAssay)
+	
+    o <- SummarizedExperiment(assays = SimpleList(assay(res$'-',inputAssay) + assay(res$'+',inputAssay)),
+                              rowRanges = rowRanges(res$'-'),
                               colData = colData(ctss))
     assayNames(o) <- inputAssay
     
