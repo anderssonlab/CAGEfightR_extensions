@@ -158,7 +158,7 @@ quantifyDivergentLoci <- function(loci, ctss, inputAssay="counts") {
 	res <- quantifyStrandwiseDivergentLoci(loci, ctss, inputAssay)
 	
     o <- SummarizedExperiment(assays = SimpleList(assay(res$'-',inputAssay) + assay(res$'+',inputAssay)),
-                              rowRanges = rowRanges(res$'-'),
+                              rowRanges = loci,
                               colData = colData(ctss))
     assayNames(o) <- inputAssay
     
