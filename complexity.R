@@ -11,7 +11,7 @@ calcComplexity <- function(object, txModels, step=1e6, CTSSunexpressed=1, geneun
 
     message("Subsampling counts")
     res <- c(list(data.frame(target=0,sample=colnames(object),totalTags=0,numberCTSSs=0,numberGenes=0)),
-             bplapply(targets, function(t) {
+             lapply(targets, function(t) {
                   
                  x <- subsampleTarget(object, "counts", t)
                  if (minCTSSsupport > 1)
