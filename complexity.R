@@ -2,47 +2,30 @@ require("CAGEfightR")
 
 source("CAGEfightR_extensions/utils.R")
 
-calcCTSSComplexity <- function(object, inputAssay = "counts", step=1e6, unexpressed=0) {
+calcComplexity <- function(object, txModels, step=1e6, CTSSunexpressed=1, geneunexpressed=9, minCTSSsupport=2) {
 
-    object <- calcTotalTags(object, inputAssay=inputAssay)
-
-    targets <- seq(step,max(object$totalTags),by=step)
-
-    res <- lapply(targets, function(t) {
-        message("subsampling to ",t,"...")
-
-        x <- subsampleTarget(object, inputAssay, t)
-        x <- calcNumberCTSSs(x, inputAssay, unexpressed = unexpressed)
-        x <- calcTotalTags(x, inputAssay=inputAssay)
-
-        df <- data.frame(target=t,sample=colnames(x),totalTags=x$totalTags,numberCTSSs=x$numberCTSSs)
-        df[object$totalTags<t,c("totalTags","numberCTSSs")] <- NA
-
-        df
-    })
-    
-    do.call("rbind",res)
-}
-
-calcGeneComplexity <- function(object, txModels, inputAssay = "counts", step=1e6, unexpressed=0) {
-
-    object <- calcTotalTags(object, inputAssay=inputAssay)
-    object <- assignGeneID(object, geneModels = txModels, outputColumn = "geneID")
+    object <- suppressWarnings(calcTotalTags(object, inputAssay="counts"))
+    object <- suppressMessages(suppressWarnings(assignGeneID(object, geneModels = txModels, outputColumn = "geneID")))
 
     targets <- seq(step,max(object$totalTags),by=step)
 
-    res <- lapply(targets, function(t) {
-        message("subsampling to ",t,"...")
+    message("Subsampling counts")
+    res <- c(list(data.frame(target=0,sample=colnames(object),totalTags=0,numberCTSSs=0,numberGenes=0)),
+             bplapply(targets, function(t) {
+                  
+                 x <- subsampleTarget(object, "counts", t)
+                 if (minCTSSsupport > 1)
+                     x <- suppressMessages(subsetBySupport(x, unexpressed=CTSSunexpressed, minSamples=minCTSSsupport))
 
-        x <- subsampleTarget(object, inputAssay, t)
-        x <- calcNumberGenes(x, txModels, inputAssay, unexpressed = unexpressed)
-        x <- calcTotalTags(x, inputAssay=inputAssay)
-
-        df <- data.frame(target=t,sample=colnames(x),totalTags=x$totalTags,numberGenes=x$numberGenes)
-        df[object$totalTags<t,c("totalTags","numberGenes")] <- NA
-
-        df
-    })
+                 x <- suppressWarnings(calcTotalTags(x, inputAssay="counts"))
+                 x <- suppressWarnings(calcNumberCTSSs(x, inputAssay="counts", unexpressed = CTSSunexpressed))
+                 x <- suppressWarnings(calcNumberGenes(x, txModels, inputAssay="counts", unexpressed = geneunexpressed))
+                 
+                 df <- data.frame(target=t,sample=colnames(x),totalTags=x$totalTags,numberCTSSs=x$numberCTSSs,numberGenes=x$numberGenes)
+                 df[object$totalTags<t,c("totalTags","numberCTSSs","numberGenes")] <- NA
+                 
+                 df
+             }))
     
     do.call("rbind",res)
 }
