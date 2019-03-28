@@ -12,12 +12,13 @@ calcComplexity <- function(object, txModels, step=1e6, CTSSunexpressed=1, geneun
     message("Subsampling counts")
     res <- c(list(data.frame(target=0,sample=colnames(object),totalTags=0,numberCTSSs=0,numberGenes=0)),
              lapply(targets, function(t) {
+                 message(t)
                   
                  x <- subsampleTarget(object, "counts", t)
+                 x <- suppressWarnings(calcTotalTags(x, inputAssay="counts"))
                  if (minCTSSsupport > 1)
                      x <- suppressMessages(subsetBySupport(x, unexpressed=CTSSunexpressed, minSamples=minCTSSsupport))
 
-                 x <- suppressWarnings(calcTotalTags(x, inputAssay="counts"))
                  x <- suppressWarnings(calcNumberCTSSs(x, inputAssay="counts", unexpressed = CTSSunexpressed))
                  x <- suppressWarnings(calcNumberGenes(x, txModels, inputAssay="counts", unexpressed = geneunexpressed))
                  
