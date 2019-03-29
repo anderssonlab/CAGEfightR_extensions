@@ -43,6 +43,74 @@ calcNumberGenes <- function(object, txModels, inputAssay = "counts", outputColum
     object
 }
 
+calcNumberDivergentLoci <- function(object, loci, inputAssay="counts", outputColumn = "numberLoci", unexpressed = 0, requirebidirectional=FALSE) {
+    ## Prechecks
+    assert_that(methods::is(object, "SummarizedExperiment"),
+                not_empty(object),
+                inputAssay %in% assayNames(object),
+                is.string(inputAssay),
+                is.string(outputColumn))
+    
+    if (outputColumn %in% colnames(colData(object))) {
+        warning("object already has a column named ", outputColumn, " in colData: It will be overwritten!")
+    }
+    
+    ## Calculate number of expressed loci
+    res <- quantifyStrandwiseDivergentLoci(loci, object, inputAssay=inputAssay)
+    m <- assay(res$'-', inputAssay)
+    p <- assay(res$'+', inputAssay)
+    expressed <- sapply(colnames(m), function(i) m[,i]+p[,i]>unexpressed)
+    if (requirebidirectional)
+        expressed <- expressed & sapply(colnames(m), function(i) m[,i]>0 & p[,i]>0)
+    colData(object)[, outputColumn] <- colSums(expressed)
+    
+    ## Return
+    object
+}
+
+## loci: GRanges
+## ctss: RangedSummarisedExperiment
+quantifyStrandwiseDivergentLoci <- function(loci, ctss, inputAssay="counts") {
+    win_1 <- loci
+    end(win_1) <- start(loci$thick)-1
+    strand(win_1) <- "-"
+    
+    win_2 <- loci
+    start(win_2) <- start(loci$thick)+1
+    strand(win_2) <- "+"
+
+    m1 <- assay(quantifyClusters(ctss, win_1, inputAssay = inputAssay),inputAssay)
+    m2 <- assay(quantifyClusters(ctss, win_2, inputAssay = inputAssay),inputAssay)
+
+	m <- SummarizedExperiment(assays = SimpleList(m1),
+                              rowRanges = loci,
+                              colData = colData(ctss))
+    assayNames(m) <- inputAssay
+	p <- SummarizedExperiment(assays = SimpleList(m2),
+                              rowRanges = loci,
+                              colData = colData(ctss))
+    assayNames(p) <- inputAssay
+    
+	res <- list(m,p)
+	names(res) <- c("-","+")
+
+    res
+}
+
+## loci: GRanges
+## ctss: RangedSummarisedExperiment
+quantifyDivergentLoci <- function(loci, ctss, inputAssay="counts") {
+
+	res <- quantifyStrandwiseDivergentLoci(loci, ctss, inputAssay)
+	
+    o <- SummarizedExperiment(assays = SimpleList(assay(res$'-',inputAssay) + assay(res$'+',inputAssay)),
+                              rowRanges = loci,
+                              colData = colData(ctss))
+    assayNames(o) <- inputAssay
+    
+    o
+}
+
 ## nonzero function from the DAPAR package (https://rdrr.io/bioc/DAPAR/src/R/utils.R)
 nonzero <- function(x){
     stopifnot(inherits(x, "dgCMatrix"))
