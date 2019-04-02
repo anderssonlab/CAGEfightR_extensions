@@ -40,7 +40,7 @@ cumulativeFractionAroundLoci <- function(loci, ctss, max_dist=1000) {
         a <- a[nz]
         sapply(seq(0,max_dist,by=1), function(i) sum(a[da==i]))
     })
-    cat("/n")
+    cat("\n")
     fracs <- sapply(colnames(fracs),function(n) cumsum(fracs[,n]/ctss$totalTags[n]))
 
     cumfrac <- cbind(data.frame(distance=seq(0,max_dist,by=1),fracs))
