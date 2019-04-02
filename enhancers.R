@@ -1,5 +1,4 @@
 require("CAGEfightR")
-require("parallel")
 source("CAGEfightR_extensions/utils.R")
 
 ## Object: GRanges
