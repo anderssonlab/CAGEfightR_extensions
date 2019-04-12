@@ -19,20 +19,27 @@ heatmapData <- function(regions, data, column="score", transform_fn=identity, ..
     nr <- names(regionsByStrand)[sapply(regionsByStrand, function(x) length(x)>0)]
     nd <- names(dataByStrand)[sapply(dataByStrand, function(x) sum(sapply(x,sum))>0)]
     
-    sapply(nr, function(r) {
+    res <- lapply(nr, function(r) {
         message("extracting data for strand: ", r)
         
-        sapply(nd, function(d) {
+        dat <- lapply(nd, function(d) {
             message("   ",d)
             vl <- Views(dataByStrand[[d]], regionsByStrand[[r]])
             n <- paste0(unlist(lapply(names(vl), function(nv) rep(nv,length(vl[[nv]])))), ":",
                         unlist(lapply(vl,start)), "-", unlist(lapply(vl,end)), ";", d)
-
+            
             vlen <- sapply(vl,length)
             
             m <- do.call("rbind",lapply(vl[vlen>0], function(v) t(viewApply(v,function(x) transform_fn(as.vector(x,mode="numeric"),...)))))
             rownames(m) <- n
             m
-        }, USE.NAMES=TRUE)
-    }, USE.NAMES=TRUE)
+        })
+        names(dat) <- nd
+
+        dat
+    })
+
+    names(res) <- nr
+
+    res
 }
