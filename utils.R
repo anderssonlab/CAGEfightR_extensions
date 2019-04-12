@@ -204,13 +204,13 @@ splitByStrand <- function(object) {
     split(object, strand(object))
 }
 
-splitPooled <- function(object){
+splitPooled <- function(object, weight="score"){
 
     ## Split by strand
     o <- splitByStrand(object)
 
     ## Calculate coverage
-    o <- lapply(o, coverage, weight="score")
+    o <- lapply(o, coverage, weight=weight)
 
     ## Round to handle floating point errors
     o <- lapply(o, round, digits=9)
