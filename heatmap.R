@@ -13,6 +13,12 @@ heatmapData <- function(regions, data, column="score", transform_fn=identity, ..
     assert_that(length(unique(width(regions)))==1,
                 column %in% colnames(mcols(data)))
 
+    sl <- intersect(seqlevels(regions),seqlevels(data))
+    if (!all(seqlevels(regions) %in% sl) || !all(seqlevels(data) %in% sl)) {
+        warning("seqlevels differ between regions and data GRanges obejects, subsetting to intersection")
+        seqlevels(regions, pruning.mode="coarse") <- seqlevels(data, pruning.mode="coarse") <- sl
+    }   
+    
     regionsByStrand <- splitByStrand(regions)
     dataByStrand <- splitPooled(data, weight=column)
 
