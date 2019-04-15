@@ -23,7 +23,7 @@ heatmapData <- function(regions, data, column="score", transform_fn=identity, ..
     dataByStrand <- splitPooled(data, weight=column)
 
     nr <- names(regionsByStrand)[sapply(regionsByStrand, function(x) length(x)>0)]
-    nd <- names(dataByStrand)[sapply(dataByStrand, function(x) sum(sapply(x,sum))>0)]
+    nd <- names(dataByStrand)[sapply(dataByStrand, function(x) any(sapply(x,function(y) any(y!=0))))]
     
     res <- lapply(nr, function(r) {
         message("extracting data for strand: ", r)
