@@ -11,7 +11,7 @@ heatmapData <- function(regions, data, column="score", transform_fn=identity, ..
     
     ## Check regions
     assert_that(length(unique(width(regions)))==1,
-                column %in% colnames(mcols(regions)))
+                column %in% colnames(mcols(data)))
 
     regionsByStrand <- splitByStrand(regions)
     dataByStrand <- splitPooled(data, weight=column)
