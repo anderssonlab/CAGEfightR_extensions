@@ -10,7 +10,7 @@ source("CAGEfightR_extensions/utils.R")
 
 ## GC normalization approach described in Pickrell et al 2010, Nature
 
-conditionalNormalize <- function(object, inputAssay="counts", outputAssay="normalized", conditionalColumn="GC", bins=200) {
+conditionalNormalize <- function(object, inputAssay="counts", outputAssay="normalized", conditionalColumn="GC", bins=200, aggregate.fn=sum) {
     
     assert_that(methods::is(object, "SummarizedExperiment"),
                 inputAssay %in% assayNames(object),
@@ -26,7 +26,7 @@ conditionalNormalize <- function(object, inputAssay="counts", outputAssay="norma
     b.m <- b.m[,2]
     names(b.m) <- n
 
-    y.b <- aggregate(as.matrix(y),by=list(b),FUN=sum)
+    y.b <- aggregate(as.matrix(y),by=list(b),FUN=aggregate.fn)
     b.g <- y.b[,1]
     rownames(y.b) <- b.g
     y.b <- y.b[names(b.m),]
@@ -57,3 +57,12 @@ conditionalNormalize <- function(object, inputAssay="counts", outputAssay="norma
     ## return
     object
 }
+
+conditionalMedianNormalize <- function(object, inputAssay="counts", outputAssay="normalized", conditionalColumn="GC", bins=200)
+    conditionalNormalize(object, inputAssay, outputAssay, conditionalColumn, bins, aggregate.fn=function(x) median(x[x>0]))
+
+conditionalMeanNormalize <- function(object, inputAssay="counts", outputAssay="normalized", conditionalColumn="GC", bins=200)
+    conditionalNormalize(object, inputAssay, outputAssay, conditionalColumn, bins, aggregate.fn=function(x) mean(x[x>0]))
+
+conditionalSumNormalize <- function(object, inputAssay="counts", outputAssay="normalized", conditionalColumn="GC", bins=200)
+    conditionalNormalize(object, inputAssay, outputAssay, conditionalColumn, bins, aggregate.fn=sum)
