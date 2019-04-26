@@ -7,10 +7,11 @@ source("CAGEfightR_extensions/utils.R")
 ## inputAssay: assay to normalize
 ## outputAssay: where to store normalized results
 ## conditionalColumn: numeric row-wise vector to normalize against
+## offsetAssay: where to store offset
 
-## GC normalization approach described in Pickrell et al 2010, Nature
+## GC normalization based on approach described in Pickrell et al 2010, Nature
 
-conditionalNormalize <- function(object, inputAssay="counts", outputAssay="normalized", conditionalColumn="GC", bins=200, aggregate.fn=sum) {
+conditionalNormalize <- function(object, inputAssay="counts", outputAssay="normalized", conditionalColumn="GC", offsetAssay=NULL, bins=200, minCount=1, sizeFactors=NULL, aggregate.fn=sum) {
     
     assert_that(methods::is(object, "SummarizedExperiment"),
                 inputAssay %in% assayNames(object),
@@ -20,7 +21,7 @@ conditionalNormalize <- function(object, inputAssay="counts", outputAssay="norma
     
     y <- assay(object,inputAssay)
     x <- as.numeric(mcols(object)[,conditionalColumn])
-    b <- as.character(Hmisc::cut2(x,g=bins,labels=FALSE))
+    b <- as.character(Hmisc::cut2(x, unique(quantile(x, seq(1/bins, 1, 1/bins)))))
     b.m <- aggregate(x, by=list(b), FUN=mean)
     n <- b.m[,1]
     b.m <- b.m[,2]
@@ -33,12 +34,16 @@ conditionalNormalize <- function(object, inputAssay="counts", outputAssay="norma
     y.b <- data.matrix(y.b[,-1])
 
     message("calculating relative enrichments...")
+
+    s <- colSums(y.b) / sum(y.b)
+    if (!is.null(sizeFactors))
+        s <- sizeFactors / sum(sizeFactors)
     
-    f <- log2( t( t(y.b / rowSums(y.b)) / (colSums(y.b) / sum(y.b)) ) )
+    f <- log2( t( t(y.b / rowSums(y.b)) / s ) )
     fit <- lapply(1:ncol(y), function(i) {
         b.m.i <- b.m
         f.i <- f[,i]
-        missing <- which(is.na(f[,i]) | is.infinite(f[,i]))
+        missing <- which(is.na(f[,i]) | is.infinite(f[,i]) | y.b[,i] < minCount)
         if (length(missing)>0) {
             b.m.i <- b.m.i[-missing]
             f.i <- f.i[-missing]
@@ -47,22 +52,17 @@ conditionalNormalize <- function(object, inputAssay="counts", outputAssay="norma
     })
 
     message("normalizing data according to enrichments...")
-    
-    y_normed <- Matrix::Matrix(sapply(1:ncol(y), function(i) ceiling(y[,i] * 2^(-1*predict(fit[[i]],b.m[b])$y))))
+
+    offset <- Matrix::Matrix(sapply(1:ncol(y), function(i) predict(fit[[i]],b.m[b])$y))
+    y_normed <- Matrix::Matrix(ceiling(y * 2^(-offset)))
 
     dimnames(y_normed) <- dimnames(y)
+    dimnames(offset) <- dimnames(y)
     
     assay(object, outputAssay) <- y_normed
-    
+    if (!is.null(offsetAssay))
+        assay(object, offsetAssay) <- offset
+
     ## return
     object
 }
-
-conditionalMedianNormalize <- function(object, inputAssay="counts", outputAssay="normalized", conditionalColumn="GC", bins=200)
-    conditionalNormalize(object, inputAssay, outputAssay, conditionalColumn, bins, aggregate.fn=function(x) median(x[x>0]))
-
-conditionalMeanNormalize <- function(object, inputAssay="counts", outputAssay="normalized", conditionalColumn="GC", bins=200)
-    conditionalNormalize(object, inputAssay, outputAssay, conditionalColumn, bins, aggregate.fn=function(x) mean(x[x>0]))
-
-conditionalSumNormalize <- function(object, inputAssay="counts", outputAssay="normalized", conditionalColumn="GC", bins=200)
-    conditionalNormalize(object, inputAssay, outputAssay, conditionalColumn, bins, aggregate.fn=sum)
