@@ -11,7 +11,7 @@ source("CAGEfightR_extensions/utils.R")
 
 ## GC normalization based on approach described in Pickrell et al 2010, Nature
 
-conditionalNormalize <- function(object, inputAssay="counts", outputAssay="normalized", conditionalColumn="GC", offsetAssay=NULL, bins=200, minCount=1, sizeFactors=NULL, aggregate.fn=sum) {
+conditionalNormalize <- function(object, inputAssay="counts", outputAssay="normalized", conditionalColumn="GC", offsetAssay=NULL, bins=200, sizeFactors=NULL, aggregate.fn=sum) {
     
     assert_that(methods::is(object, "SummarizedExperiment"),
                 inputAssay %in% assayNames(object),
@@ -43,7 +43,7 @@ conditionalNormalize <- function(object, inputAssay="counts", outputAssay="norma
     fit <- lapply(1:ncol(y), function(i) {
         b.m.i <- b.m
         f.i <- f[,i]
-        missing <- which(is.na(f[,i]) | is.infinite(f[,i]) | y.b[,i] < minCount)
+        missing <- which(is.na(f[,i]) | is.infinite(f[,i]))
         if (length(missing)>0) {
             b.m.i <- b.m.i[-missing]
             f.i <- f.i[-missing]
