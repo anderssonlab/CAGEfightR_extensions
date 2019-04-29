@@ -35,9 +35,11 @@ conditionalNormalize <- function(object, inputAssay="counts", outputAssay="norma
 
     message("calculating relative enrichments...")
 
+    if (is.null(sizeFactors))
+        sizeFactors <- rep(1,ncol(y))
+
+    y.b <- sapply(1:ncol(y.b), function(i) y.b[,i] / sizeFactors[i])
     s <- colSums(y.b) / sum(y.b)
-    if (!is.null(sizeFactors))
-        s <- sizeFactors / sum(sizeFactors)
     
     f <- log2( t( t(y.b / rowSums(y.b)) / s ) )
     fit <- lapply(1:ncol(y), function(i) {
@@ -64,5 +66,16 @@ conditionalNormalize <- function(object, inputAssay="counts", outputAssay="norma
         assay(object, offsetAssay) <- offset
 
     ## return
+    object
+}
+
+normalizeBySizeFactors <- function(object, sizeFactors, inputAssay="counts", outputAssay="normalized") {
+
+    assert_that(methods::is(object, "SummarizedExperiment"),
+                inputAssay %in% assayNames(object),
+                length(sizeFactors) == ncol(object))
+
+    assay(object, outputAssay) <- Matrix::t(Matrix::t(assay(object, inputAssay)) / sizeFactors)
+
     object
 }
