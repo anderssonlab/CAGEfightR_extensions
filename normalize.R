@@ -11,26 +11,33 @@ source("CAGEfightR_extensions/utils.R")
 
 ## GC normalization based on approach described in Pickrell et al 2010, Nature
 
-conditionalNormalize <- function(object, inputAssay="counts", outputAssay="normalized", conditionalColumn="GC", offsetAssay=NULL, bins=200, sizeFactors=NULL, aggregate.fn=sum) {
+conditionalNormalize <- function(object, inputAssay="counts", outputAssay="normalized", conditionalColumn="GC", offsetAssay=NULL, bins=200,
+                                 sizeFactors=NULL, minCount=1, minSamples=1,aggregate.fn=sum) {
     
     assert_that(methods::is(object, "SummarizedExperiment"),
                 inputAssay %in% assayNames(object),
                 conditionalColumn %in% colnames(mcols(object)))
 
     message("binning data according to conditional column...")
-    
+
     y <- assay(object,inputAssay)
+    keep <- which(Matrix::rowSums(y>minCount) >= minSamples)
+
     x <- as.numeric(mcols(object)[,conditionalColumn])
     b <- as.character(Hmisc::cut2(x, unique(quantile(x, seq(1/bins, 1, 1/bins)))))
     b.m <- aggregate(x, by=list(b), FUN=mean)
+    b.m.keep <- aggregate(x[keep], by=list(b[keep]), FUN=mean)
     n <- b.m[,1]
     b.m <- b.m[,2]
     names(b.m) <- n
+    n <- b.m.keep[,1]
+    b.m.keep <- b.m.keep[,2]
+    names(b.m.keep) <- n
 
-    y.b <- aggregate(as.matrix(y),by=list(b),FUN=aggregate.fn)
+    y.b <- aggregate(as.matrix(y[keep,]),by=list(b[keep]),FUN=aggregate.fn)
     b.g <- y.b[,1]
     rownames(y.b) <- b.g
-    y.b <- y.b[names(b.m),]
+    y.b <- y.b[names(b.m.keep),]
     y.b <- data.matrix(y.b[,-1])
 
     message("calculating relative enrichments...")
@@ -45,7 +52,7 @@ conditionalNormalize <- function(object, inputAssay="counts", outputAssay="norma
     
     f <- log2( t( t(y.b / rowSums(y.b)) / s ) )
     fit <- lapply(1:ncol(y), function(i) {
-        b.m.i <- b.m
+        b.m.i <- b.m.keep
         f.i <- f[,i]
         missing <- which(is.na(f[,i]) | is.infinite(f[,i]))
         if (length(missing)>0) {
