@@ -37,6 +37,8 @@ conditionalNormalize <- function(object, inputAssay="counts", outputAssay="norma
 
     if (is.null(sizeFactors))
         sizeFactors <- rep(1,ncol(y))
+    else
+        sizeFactors <- sizeFactors / mean(sizeFactors)
 
     y.b <- sapply(1:ncol(y.b), function(i) y.b[,i] / sizeFactors[i])
     s <- colSums(y.b) / sum(y.b)
@@ -55,8 +57,9 @@ conditionalNormalize <- function(object, inputAssay="counts", outputAssay="norma
 
     message("normalizing data according to enrichments...")
 
-    offset <- Matrix::Matrix(sapply(1:ncol(y), function(i) predict(fit[[i]],b.m[b])$y))
-    y_normed <- Matrix::Matrix(ceiling(y * 2^(-offset)))
+    offset <- -1*Matrix::Matrix(sapply(1:ncol(y), function(i) predict(fit[[i]],b.m[b])$y))
+    y_normed <- Matrix::Matrix(round(y * 2^(offset)))
+    y_normed <- Matrix::Matrix(sapply(1:ncol(y), function(i) {x <- y_normed[,i]; x[x==0 & y[,i]>0] <- 1; x}))
 
     dimnames(y_normed) <- dimnames(y)
     dimnames(offset) <- dimnames(y)
@@ -76,6 +79,24 @@ normalizeBySizeFactors <- function(object, sizeFactors, inputAssay="counts", out
                 length(sizeFactors) == ncol(object))
 
     assay(object, outputAssay) <- Matrix::t(Matrix::t(assay(object, inputAssay)) / sizeFactors)
+
+    object
+}
+
+TPMnormalizeBySizeFactors <- function(object, sizeFactors, inputAssay="counts", outputAssay="TPM") {
+
+    assert_that(methods::is(object, "SummarizedExperiment"),
+                inputAssay %in% assayNames(object),
+                length(sizeFactors) == ncol(object))
+
+    ## Centre size factors
+    sf <- sizeFactors / mean(sizeFactors)
+
+    ## Calculate scaling factors
+    a <- assay(object, inputAssay)
+    sf <- 1e6 / (sf * mean(Matrix::colSums(a)))
+    
+    assay(object, outputAssay) <- Matrix::t(Matrix::t(a) * sf)
 
     object
 }
