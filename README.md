@@ -7,6 +7,6 @@ R functions for
 * decomposition of CAGE tag clusters
 * calculation of genomic background (noise) expression
 * normalization across libraries versus GC content
-* calculation of bias in expression coverage versus batch
+* calculation of bias in expression coverage and expression support versus batch
 
 The functions extend the CAGE analysis framework of CAGEfightR (https://github.com/MalteThodberg/CAGEfightR).
