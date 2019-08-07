@@ -19,7 +19,7 @@ CTSSvariation <- function(object, ctss, inputAssay="counts", outputColumn="MSE",
     message("Calculating variation...")
     
     data <- assay(ctss, inputAssay)
-    value <- unlist(bplapply(ids, function(x) {
+    value <- unlist(bplapply(ids[1:11], function(x) {
         d <- scale(data[x,], center=standardize, scale=standardize)
         fn(d)
     }))
@@ -33,5 +33,22 @@ mean_squared_error <- function(d) {
     val <- which(apply(d, 2, function(x) !(any(is.na(x)))))
     cent <- rowMeans(d[,val])
     sum(apply(d[,val], 2, function(x) sum((x - cent)^2))) / nrow(d)
+}
+
+average_divergence <- function(d) {
+    val <- which(apply(d, 2, function(x) !(any(is.na(x)))))
+    cent <- rowMeans(d[,val])
+    cent <- cent / sum(cent)
+    
+    sum(apply(d[,val], 2, function(x) {
+        x <- x / sum(x)
+        m <- 0.5 * (cent + x)
+        z <- 0.5 * (x * log2(x/m) + cent * log2(cent/m))
+        
+        z[z == -Inf] <- 0
+        z[z == Inf] <- 0
+        z[is.na(z)] <- 0
+        sqrt(sum(z))
+    })) / length(val)
 }
 
