@@ -13,10 +13,9 @@ corrprofiles <- function(object, pooled, flank=300, max.lag=300) {
 
     ## retrieve data around regions
     message("Retrieving data")
-    data <- heatmapData(object, pooled)
+    data <- heatmapData(object, as(rowRanges(pooled),"GRanges"))
 
-    message("Calculating correlation profiles")
-    strand <- strand=as.character(strand(object))
+    strand <- as.character(strand(object))
     sense_matrix <- matrix(0, ncol=2*flank+1, nrow=length(object))
     antisense_matrix <- matrix(0, ncol=2*flank+1, nrow=length(object))
 
@@ -25,7 +24,10 @@ corrprofiles <- function(object, pooled, flank=300, max.lag=300) {
     antisense_matrix[strand=="+",] <- data[["+"]][["-"]]
     antisense_matrix[strand=="-",] <- data[["-"]][["+"]][,(2*flank+1):1]
 
+    message("Calculating autocorrelation profiles for sense strand")
     ac_matrix <- t(sapply(1:length(object), function(i) acf(sense_matrix[i,],plot=FALSE,max.lag=max.lag)$acf[,1,1]))
+
+    message("Calculating crosscorrelation profiles")
     cc_matrix <- t(sapply(1:length(object), function(i) ccf(sense_matrix[i,],antisense_matrix[i,],plot=FALSE,max.lag=max.lag)$acf[,1,1]))
 
     rownames(ac_matrix) <- names(object)
