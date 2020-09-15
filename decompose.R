@@ -162,7 +162,7 @@ local_maxima_decompose <- function(views, fraction = 0.1, maximaDist=20, maxGap=
             ## merge with previous cluster if proximal
             merge <- FALSE
             if (length(starts) > 0 && mergeDist>=0) {
-                m <- c(which(starts-mergeDist+1 %in% s:e),which(ends+mergeDist+1 %in% s:e))
+                m <- c(which(starts-mergeDist-1 %in% s:e),which(ends+mergeDist+1 %in% s:e))
                 if (length(m)>0) {
                     merge <- TRUE
                     m <- min(m)
