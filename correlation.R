@@ -5,7 +5,7 @@ source("CAGEfightR_extensions/heatmap.R")
 
 ## object: GRanges
 ## pooled: RangedSummarizedExperiment
-corrprofiles <- function(object, pooled, flank=300, max.lag=300) {
+corrprofiles <- function(object, pooled, flank=300, lag.max=300) {
 
     ## flank TCs around their summits
     start(object) <- start(object$thick)-flank
@@ -25,10 +25,10 @@ corrprofiles <- function(object, pooled, flank=300, max.lag=300) {
     antisense_matrix[strand=="-",] <- data[["-"]][["+"]][,(2*flank+1):1]
 
     message("Calculating autocorrelation profiles for sense strand")
-    ac_matrix <- t(sapply(1:length(object), function(i) acf(sense_matrix[i,],plot=FALSE,max.lag=max.lag)$acf[,1,1]))
+    ac_matrix <- t(sapply(1:length(object), function(i) acf(sense_matrix[i,],plot=FALSE,lag.max=lag.max)$acf[,1,1]))
 
     message("Calculating crosscorrelation profiles")
-    cc_matrix <- t(sapply(1:length(object), function(i) ccf(sense_matrix[i,],antisense_matrix[i,],plot=FALSE,max.lag=max.lag)$acf[,1,1]))
+    cc_matrix <- t(sapply(1:length(object), function(i) ccf(sense_matrix[i,],antisense_matrix[i,],plot=FALSE,lag.max=lag.max)$acf[,1,1]))
 
     rownames(ac_matrix) <- names(object)
     rownames(cc_matrix) <- names(object)
