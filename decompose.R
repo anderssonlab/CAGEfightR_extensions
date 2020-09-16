@@ -104,7 +104,7 @@ summit_decompose <- function(views, fraction = 0.1, mergeDist=20) {
 ## Performs local summit decomposition for each local maxima separately in decreasing order of expression level
 ## For each local summit decomposition, subclusters will be merged if within maxGap distance.
 ## Final subclusters within mergeDist bp will be merged
-local_maxima_decompose <- function(views, fraction = 0.1, maximaDist=20, maxGap=maximaDist, mergeDist=-1) {
+local_maxima_decompose <- function(views, fraction = 0.1, maximaDist=20, maxGap=maximaDist, mergeDist=-1, smoothPad=0) {
 
     if (length(views)==0)
         return(IRanges())
@@ -128,6 +128,18 @@ local_maxima_decompose <- function(views, fraction = 0.1, maximaDist=20, maxGap=
                 next
 
             k <- which(r >= fraction*r[i] & r<=r[i])
+
+            if (smoothPad>0) {
+                nk <- k
+                for (j in 1:smoothPad) {
+                    nk <- c(nk,k+j,k-j)
+                }
+                k <- sort(unique(nk))
+                if (any(k<1))
+                    k <- k[-which(k<0)]
+                if (any(k>length(r)))
+                    k <- k[-which(k>length(r))]
+            }
 
             ## special case: summit position only
             s <- i
