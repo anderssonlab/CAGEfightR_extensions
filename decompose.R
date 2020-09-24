@@ -103,6 +103,7 @@ summit_decompose <- function(views, fraction = 0.1, mergeDist=20) {
 ## Decompose tag cluster into subclusters according to CTSS expression fraction of local maxima CTSS expression
 ## Performs local summit decomposition for each local maxima separately in decreasing order of expression level
 ## For each local summit decomposition, subclusters will be merged if within maxGap distance.
+## If smoothPad>0, neighbouring non-zero CTSSs within smoothPad distance of CTSSs fulfilling the summit fraction criterion will also be included.
 ## Final subclusters within mergeDist bp will be merged
 local_maxima_decompose <- function(views, fraction = 0.1, maximaDist=20, maxGap=maximaDist, mergeDist=-1, smoothPad=0) {
 
@@ -139,6 +140,8 @@ local_maxima_decompose <- function(views, fraction = 0.1, maximaDist=20, maxGap=
                     k <- k[-which(k<0)]
                 if (any(k>length(r)))
                     k <- k[-which(k>length(r))]
+                if (any(r[k]==0))
+                    k <- k[-which(r[k]==0)]
             }
 
             ## special case: summit position only
