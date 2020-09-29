@@ -31,10 +31,8 @@ decompose <- function(object, pooled, fn=summit_decompose, ...) {
     views_minus <- Views(covByStrand$`-`, irl_minus)
 
     message("Decomposing tag clusters")
-    irl_plus <- methods::as(lapply(views_plus, function(views) {cat(".");fn(views, ...)}),"IRangesList")
-    cat("\n")
-    irl_minus <- methods::as(lapply(views_minus, function(views) {cat(".");fn(views, ...)}),"IRangesList")
-    cat("\n")
+    irl_plus <- methods::as(lapply(views_plus, function(views) fn(views, ...)),"IRangesList")
+    irl_minus <- methods::as(lapply(views_minus, function(views) fn(views, ...)),"IRangesList")
 
     message("Quantifying decomposed tag clusters...")
     decomposedTCs <- TCstats(coverage_plus = covByStrand$`+`,
