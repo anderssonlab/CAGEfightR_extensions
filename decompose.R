@@ -137,7 +137,7 @@ local_maxima_decompose <- function(views, fraction = 0.1, maximaDist=20, maxGap=
                 }
                 k <- sort(unique(nk))
                 if (any(k<1))
-                    k <- k[-which(k<0)]
+                    k <- k[-which(k<1)]
                 if (any(k>length(r)))
                     k <- k[-which(k>length(r))]
                 if (any(r[k]==0))
@@ -174,27 +174,24 @@ local_maxima_decompose <- function(views, fraction = 0.1, maximaDist=20, maxGap=
             ## set vales in sub cluster to 0 for next local maxima
             r[s:e] <- 0
 
-            ## merge with previous cluster if proximal
-            merge <- FALSE
-            if (length(starts) > 0 && mergeDist>=0) {
-                m <- c(which((starts-mergeDist-1) %in% s:e),which((ends+mergeDist+1) %in% s:e))
-                if (length(m)>0) {
-                    merge <- TRUE
-                    m <- min(m)
-                    starts[m] <- min(starts[m],s)
-                    ends[m] <- max(ends[m],e)
-                }
-            }
+            starts <- c(starts,s)
+            ends <- c(ends,e)
+        }
 
-            if (!merge) {
-                ## store sub cluster
-                starts <- c(starts,s)
-                ends <- c(ends,e)
-            }
+        o <- order(starts)
+        starts <- starts[o]
+        ends <- ends[o]
+
+        ## merge clusters if proximal
+        if (length(starts) > 0 && mergeDist>=0) {
+            d <- starts[-1]-ends[-length(ends)]
+            gaps <- which(d>mergeDist)
+            starts <- c(starts[1],starts[gaps+1])
+            ends <- c(ends[gaps],ends[length(ends)])
         }
 
         return(as.vector(matrix(c(starts,ends),ncol=length(starts),byrow=TRUE)))
-    })
+    }, simplify=FALSE)
 
     pos <- matrix(unlist(lapply(1:length(views), function(i) {x <- pos[[i]]; lapply(seq(1,length(x),by=2), function(j) c(i,x[j],x[j+1]))})),ncol=3,byrow=TRUE)
 
