@@ -2,7 +2,7 @@ require("CAGEfightR")
 
 ## Object: GRanges
 ## ctss: RangedSummarizedExperiment
-CTSSvariation <- function(object, ctss, inputAssay="counts", outputColumn="MSE", fn=mean_squared_error) {
+CTSSdispersion <- function(object, ctss, inputAssay="counts", outputColumn="TSS_MADM", fn=tss_madm, ...) {
 
     ## Find overlaps
     message("Finding overlaps...")
@@ -15,17 +15,41 @@ CTSSvariation <- function(object, ctss, inputAssay="counts", outputColumn="MSE",
     ctss <- ctss[ids,]
     ids <- split(1:nrow(ctss), hits[-which(is.na(hits))])
 
-    ## Calculate variation
-    message("Calculating variation...")
-    
+    ## Calculate dispersion
+    message("Calculating TSS usage dispersion...")
+
     data <- assay(ctss, inputAssay)
     value <- unlist(bplapply(ids, function(x) {
-        fn(data[x,])
+        fn(data[x,],...)
     }))
 
     mcols(object)[, outputColumn] <- value
 
     object
+}
+
+madm <- function(x) {
+    m <- median(x,na.rm=TRUE)
+    if (m==0)
+        return(NA)
+    median(abs(x-m),na.rm=TRUE)/m
+}
+
+tss_madm <- function(d, pseudo=NULL, max_zero_prop=0.5) {
+    d <- as.matrix(d)
+    if (max_zero_prop < 1)
+    {
+        propz <- apply(d,1,function(x) sum(x==0))/ncol(m)
+        idx <- which(propz <= max_zero_prop)
+    }
+    else
+        idx <- 1:nrow(d)
+    if (!is.null(pseudo))
+        d <- t(t(d)+pseudo)
+    meds <- apply(d,1,median)
+    idx <- idx[which(meds[idx]>0)]
+    dnorm <- apply(d,2,function(x) x/sum(x))
+    median(apply(dnorm[idx,,drop=FALSE], 1, madm),na.rm=TRUE)
 }
 
 mean_squared_error <- function(d) {
@@ -43,34 +67,6 @@ weighted_mean_squared_error <- function(d) {
     sum(p*apply(d, 2, function(x) sum((x - cent)^2)) / nrow(d), na.rm=TRUE)
 }
 
-random_mean_squared_error <- function(d) {
-    d <- as.matrix(d)
-    t <- rowSums(d)
-    n <- nrow(d)
-    p <- colSums(d) / sum(t)
-    
-    mean(sapply(1:10, function(i) {
-        ## Subsample the pooled counts to each sample's proportion of the total
-        d <- scale(sapply(p, function(x) rbinom(n, t, x)), center=TRUE, scale=TRUE)
-        cent <- rowMeans(d,na.rm=TRUE)
-        mean(apply(d, 2, function(x) sum((x - cent)^2, na.rm=TRUE)) / nrow(d), na.rm=TRUE)
-    }), na.rm=TRUE)
-}
-
-random_weighted_mean_squared_error <- function(d) {
-    d <- as.matrix(d)
-    t <- rowSums(d)
-    n <- nrow(d)
-    p <- colSums(d) / sum(t)
-    
-    mean(sapply(1:10, function(i) {
-        ## Subsample the pooled counts to each sample's proportion of the total
-        d <- scale(sapply(p, function(x) rbinom(n, t, x)), center=TRUE, scale=TRUE)
-        cent <- rowMeans(d,na.rm=TRUE)
-        sum(p*apply(d, 2, function(x) sum((x - cent)^2, na.rm=TRUE)) / nrow(d), na.rm=TRUE)
-    }), na.rm=TRUE)
-}
-
 average_divergence <- function(d) {
     d <- as.matrix(d)
     cent <- rowMeans(d)
@@ -81,37 +77,10 @@ average_divergence <- function(d) {
         x <- x / sum(x)
         m <- 0.5 * (cent + x)
         z <- 0.5 * (x * log2(x/m) + cent * log2(cent/m))
-        
+
         z[z == -Inf] <- 0
         z[z == Inf] <- 0
         z[is.na(z)] <- 0
         sqrt(sum(z))
     }))
-}
-
-random_divergence <- function(d) {
-    d <- as.matrix(d)
-    t <- rowSums(d)
-    n <- nrow(d)
-    p <- colSums(d) / sum(t)
-
-    mean(sapply(1:10, function(i) {
-        ## Subsample the pooled counts to each sample's proportion of the total
-        d <- sapply(p, function(x) rbinom(n, t, x))
-        
-        t <- rowMeans(d)
-        cent <- t / sum(t)
-        
-        ## Average Jensen-Shannon divergence versus the cluster centroid
-        mean(apply(d, 2, function(x) {
-            x <- x / sum(x)
-            m <- 0.5 * (cent + x)
-            z <- 0.5 * (x * log2(x/m) + cent * log2(cent/m))
-            
-            z[z == -Inf] <- 0
-            z[z == Inf] <- 0
-            z[is.na(z)] <- 0
-            sqrt(sum(z))
-        }))
-    }), na.rm=TRUE)
 }
