@@ -28,6 +28,10 @@ CTSSdispersion <- function(object, ctss, inputAssay="counts", outputColumn="TSS_
     object
 }
 
+## TCdispersion <- function(object, inputAssay="counts", outputColumn="TSS_MADM", fn=madm, ...) {
+    
+## }
+
 madm <- function(x) {
     m <- median(x,na.rm=TRUE)
     if (m==0)
@@ -35,8 +39,10 @@ madm <- function(x) {
     median(abs(x-m),na.rm=TRUE)/m
 }
 
-tss_madm <- function(d, pseudo=NULL, max_zero_prop=0.5) {
+tss_madm <- function(d, pseudo=rep(0,ncol(d)), max_zero_prop=0.5) {
     d <- as.matrix(d)
+    if (nrow(d)==1)
+        return(0)
     if (max_zero_prop < 1)
     {
         propz <- apply(d,1,function(x) sum(x==0))/ncol(m)
@@ -44,11 +50,13 @@ tss_madm <- function(d, pseudo=NULL, max_zero_prop=0.5) {
     }
     else
         idx <- 1:nrow(d)
-    if (!is.null(pseudo))
-        d <- t(t(d)+pseudo)
-    meds <- apply(d,1,median)
-    idx <- idx[which(meds[idx]>0)]
-    dnorm <- apply(d,2,function(x) x/sum(x))
+    if (length(idx)==0)
+        return(NA)
+    if (length(idx)==1)
+        return(0)
+    d <- t(t(d)+pseudo)
+    dnorm <- matrix(0,nrow=nrow(d).ncol=ncol(d))
+    dnorm[idx,] <- apply(d[idx,,drop=FALSE],2,function(x) x/sum(x))
     median(apply(dnorm[idx,,drop=FALSE], 1, madm),na.rm=TRUE)
 }
 
