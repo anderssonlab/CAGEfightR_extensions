@@ -28,9 +28,20 @@ CTSSdispersion <- function(object, ctss, inputAssay="counts", outputColumn="TSS_
     object
 }
 
-## TCdispersion <- function(object, inputAssay="counts", outputColumn="TSS_MADM", fn=madm, ...) {
-    
-## }
+# object: RangedSummarizedExperiment
+TCdispersion <- function(object, inputAssay="counts", outputColumn="TC_MADM", fn=tc_madm, ...) {
+
+    message("Calculating TC dispersion...")
+
+    data <- assay(object, inputAssay)
+    value <- unlist(bplapply(1:nrow(data), function(i) {
+        fn(data[i,],...)
+    }))
+
+    mcols(object)[, outputColumn] <- value
+
+    object
+}
 
 madm <- function(x) {
     m <- median(x,na.rm=TRUE)
@@ -45,7 +56,7 @@ tss_madm <- function(d, pseudo=rep(0,ncol(d)), max_zero_prop=0.5) {
         return(0)
     if (max_zero_prop < 1)
     {
-        propz <- apply(d,1,function(x) sum(x==0))/ncol(m)
+        propz <- apply(d,1,function(x) sum(x==0))/ncol(d)
         idx <- which(propz <= max_zero_prop)
     }
     else
@@ -55,9 +66,21 @@ tss_madm <- function(d, pseudo=rep(0,ncol(d)), max_zero_prop=0.5) {
     if (length(idx)==1)
         return(0)
     d <- t(t(d)+pseudo)
-    dnorm <- matrix(0,nrow=nrow(d).ncol=ncol(d))
+    dnorm <- matrix(0,nrow=nrow(d),ncol=ncol(d))
     dnorm[idx,] <- apply(d[idx,,drop=FALSE],2,function(x) x/sum(x))
     median(apply(dnorm[idx,,drop=FALSE], 1, madm),na.rm=TRUE)
+}
+
+tc_madm <- function(d, pseudo=rep(0,length(d)), max_zero_prop=0.5) {
+    d <- as.numeric(d)
+    if (max_zero_prop < 1)
+    {
+        propz <- sum(d==0)/length(d)
+        if (propz > max_zero_prop)
+            return(NA)
+    }
+    d <- d+pseudo
+    madm(d)
 }
 
 mean_squared_error <- function(d) {
