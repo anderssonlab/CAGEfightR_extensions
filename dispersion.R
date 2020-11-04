@@ -28,7 +28,7 @@ CTSSdispersion <- function(object, ctss, inputAssay="counts", outputColumn="TSS_
     object
 }
 
-# object: RangedSummarizedExperiment
+## object: RangedSummarizedExperiment
 TCdispersion <- function(object, inputAssay="counts", outputColumn="TC_MADM", fn=tc_madm, ...) {
 
     message("Calculating TC dispersion...")
@@ -36,6 +36,57 @@ TCdispersion <- function(object, inputAssay="counts", outputColumn="TC_MADM", fn
     data <- assay(object, inputAssay)
     value <- unlist(bplapply(1:nrow(data), function(i) {
         fn(data[i,],...)
+    }))
+
+    mcols(object)[, outputColumn] <- value
+
+    object
+}
+
+## object: RangedSummarizedExperiment
+calcMedian <- function(object, inputAssay="counts", outputColumn="median") {
+
+    data <- assay(object, inputAssay)
+    value <- apply(data,1,median,na.rm=TRUE)
+
+    mcols(object)[, outputColumn] <- value
+
+    object
+}
+
+## object: RangedSummarizedExperiment
+calcMean <- function(object, inputAssay="counts", outputColumn="mean") {
+
+    data <- assay(object, inputAssay)
+    value <- rowMeans(data,na.rm=TRUE)
+
+    mcols(object)[, outputColumn] <- value
+
+    object
+}
+
+## Object: GRanges
+## ctss: RangedSummarizedExperiment
+numCTSSs <- function(object, ctss, inputAssay="counts", outputColumn="num_CTSSs", max_zero_prop=0.5) {
+
+    ## Find overlaps
+    message("Finding overlaps...")
+
+    hits <- findOverlaps(query = ctss,
+                         subject = object,
+                         select = "arbitrary")
+    hits <- factor(hits, levels=seq_along(object))
+    ids <- as.numeric(unlist(split(1:length(hits), hits)))
+    ctss <- ctss[ids,]
+    ids <- split(1:nrow(ctss), hits[-which(is.na(hits))])
+
+    ## Calculate dispersion
+    message("Calculating number of CTSSs with valid zero proportion...")
+
+    data <- assay(ctss, inputAssay)
+    value <- unlist(bplapply(ids, function(x) {
+        x <- as.matrix(x)
+        sum(apply(x,1,function(y) sum(y==0))/ncol(x) <= max_zero_prop)
     }))
 
     mcols(object)[, outputColumn] <- value
