@@ -182,19 +182,21 @@ DMadjustedCV <- function(object, inputAssay="TPM", prefix="") {
     object
 }
 
-DMadjustedUsageCV <- function(ctss, TCcolumn="TC", inputAssay="counts") {
+quantifyTCfraction <- function(ctss, TCcolumn="TC", inputAssay="TPM", outputAssay="fraction", pseudo=1e6/ctss$totalTags) {
+
+    assertthat::assert_that(isSorted(ctss))
 
     data <- assay(ctss,inputAssay)
     TCs <- mcols(ctss)[,TCcolumn]
-    for (TC in unique(TCs)) {
-        idx <- which(TCs==TC)
-        if (length(idx)>0)
-            data[idx,] <- Matrix::t(Matrix::t(data[idx,])/(Matrix::colSums(data[idx,])/1000000))
-    }
 
-    mcols(ctss)[,"usage_TPM"] <- data
+    expr <- Matrix::fac2sparse(factor(TCs,levels=unique(TCs)))
+    expr <- expr %*% data
+    expr <- expr + pseudo
+    expr <- expr[TCs,]
 
-    DMadjustedCV(ctss,inputAssay="usage_TPM",prefix="usage_")
+    assay(ctss, outputAssay) <- data / expr
+
+    ctss
 }
 
 ## Object: GRanges
