@@ -70,45 +70,65 @@ calcNumberDivergentLoci <- function(object, loci, inputAssay="counts", outputCol
 
 ## loci: GRanges
 ## ctss: RangedSummarisedExperiment
-quantifyStrandwiseDivergentLoci <- function(loci, ctss, inputAssay="counts") {
-    win_1 <- loci
-    end(win_1) <- start(loci$thick)-1
-    strand(win_1) <- "-"
-    
-    win_2 <- loci
-    start(win_2) <- start(loci$thick)+1
-    strand(win_2) <- "+"
-
-    m1 <- assay(quantifyClusters(ctss, win_1, inputAssay = inputAssay),inputAssay)
-    m2 <- assay(quantifyClusters(ctss, win_2, inputAssay = inputAssay),inputAssay)
-
-	m <- SummarizedExperiment(assays = SimpleList(m1),
-                              rowRanges = loci,
-                              colData = colData(ctss))
-    assayNames(m) <- inputAssay
-	p <- SummarizedExperiment(assays = SimpleList(m2),
-                              rowRanges = loci,
-                              colData = colData(ctss))
-    assayNames(p) <- inputAssay
-    
-	res <- list(m,p)
-	names(res) <- c("-","+")
-
-    res
+quantifyStrandwiseDivergentLoci <- function(loci, ctss, inputAssay = "counts") {
+  win_1 <- loci
+  BiocGenerics::end(win_1) <- loci$thick - 1
+  BiocGenerics::strand(win_1) <- "-"
+  
+  win_2 <- loci
+  BiocGenerics::start(win_2) <- loci$thick + 1
+  BiocGenerics::strand(win_2) <- "+"
+  
+  m1_ <- CAGEfightR::quantifyClusters(
+    object = ctss,
+    clusters = win_1,
+    inputAssay = inputAssay
+  )
+  m1 <- SummarizedExperiment::assays(m1_)[[inputAssay]]
+  
+  m2_ <- CAGEfightR::quantifyClusters(
+    object = ctss,
+    clusters = win_2,
+    inputAssay = inputAssay
+  )
+  m2 <- SummarizedExperiment::assays(m2_)[[inputAssay]]
+  
+  m <- SummarizedExperiment::SummarizedExperiment(
+    assays = S4Vectors::SimpleList(m1),
+    rowRanges = loci,
+    colData = SummarizedExperiment::colData(ctss)
+  )
+  SummarizedExperiment::assayNames(m) <- inputAssay
+  p <- SummarizedExperiment::SummarizedExperiment(
+    assays = S4Vectors::SimpleList(m2),
+    rowRanges = loci,
+    colData = SummarizedExperiment::colData(ctss)
+  )
+  SummarizedExperiment::assayNames(p) <- inputAssay
+  
+  res <- base::list(m,p)
+  base::names(res) <- c("-","+")
+  
+  res
 }
 
 ## loci: GRanges
 ## ctss: RangedSummarisedExperiment
 quantifyDivergentLoci <- function(loci, ctss, inputAssay="counts") {
-
-	res <- quantifyStrandwiseDivergentLoci(loci, ctss, inputAssay)
-	
-    o <- SummarizedExperiment(assays = SimpleList(assay(res$'-',inputAssay) + assay(res$'+',inputAssay)),
-                              rowRanges = loci,
-                              colData = colData(ctss))
-    assayNames(o) <- inputAssay
-    
-    o
+  
+  res <- quantifyStrandwiseDivergentLoci(loci, ctss, inputAssay)
+  
+  o <- SummarizedExperiment::SummarizedExperiment(
+    assays = S4Vectors::SimpleList(
+      SummarizedExperiment::assays(res$'-')[[inputAssay]] +
+        SummarizedExperiment::assays(res$'+')[[inputAssay]]
+    ),
+    rowRanges = loci,
+    colData = SummarizedExperiment::colData(ctss)
+  )
+  SummarizedExperiment::assayNames(o) <- inputAssay
+  
+  o
 }
 
 ## nonzero function from the DAPAR package (https://rdrr.io/bioc/DAPAR/src/R/utils.R)
