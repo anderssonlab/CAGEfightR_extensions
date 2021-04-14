@@ -111,7 +111,7 @@ quantifyClustersOlap <- function(object, clusters, inputAssay) {
 
 ## loci: GRanges
 ## ctss: RangedSummarisedExperiment
-quantifyStrandwiseDivergentLoci <- function(loci, ctss, inputAssay = "counts", allowDisjoint=FALSE) {
+quantifyStrandwiseDivergentLoci <- function(loci, ctss, inputAssay = "counts", requireDisjoint=TRUE) {
   win_1 <- loci
   BiocGenerics::end(win_1) <- start(loci$thick) - 1
   BiocGenerics::strand(win_1) <- "-"
@@ -121,7 +121,7 @@ quantifyStrandwiseDivergentLoci <- function(loci, ctss, inputAssay = "counts", a
   BiocGenerics::strand(win_2) <- "+"
 
   m1 <- matrix()
-  if (allowDisjoint && !isDisjoint(win_1)) {
+  if (!requireDisjoint && !isDisjoint(win_1)) {
       m1_ <- quantifyClustersOlap(
           object = ctss,
           clusters = win_1,
@@ -139,7 +139,7 @@ quantifyStrandwiseDivergentLoci <- function(loci, ctss, inputAssay = "counts", a
   }
 
   m2 <- matrix()
-  if (allowDisjoint && !isDisjoint(win_2)) {
+  if (!requireDisjoint && !isDisjoint(win_2)) {
       m2_ <- quantifyClustersOlap(
           object = ctss,
           clusters = win_2,
@@ -177,9 +177,9 @@ quantifyStrandwiseDivergentLoci <- function(loci, ctss, inputAssay = "counts", a
 
 ## loci: GRanges
 ## ctss: RangedSummarisedExperiment
-quantifyDivergentLoci <- function(loci, ctss, inputAssay="counts", allowDisjoint=FALSE) {
+quantifyDivergentLoci <- function(loci, ctss, inputAssay="counts", requireDisjoint=TRUE) {
 
-  res <- quantifyStrandwiseDivergentLoci(loci, ctss, inputAssay, allowDisjoint)
+  res <- quantifyStrandwiseDivergentLoci(loci, ctss, inputAssay, requireDisjoint)
 
   o <- SummarizedExperiment::SummarizedExperiment(
     assays = S4Vectors::SimpleList(
