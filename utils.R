@@ -70,7 +70,7 @@ calcNumberDivergentLoci <- function(object, loci, inputAssay="counts", outputCol
 
 quantifyClustersOlap <- function(object, clusters, inputAssay) {
 
-    revmap <- reduce(clusters, with.revmap=TRUE)$revmap
+    revmap <- GenomicRanges::reduce(clusters, with.revmap=TRUE)$revmap
     max.nr <- max(sapply(revmap, length))
     ids <- lapply(1:max.nr, function(level) setdiff(sapply(revmap, `[`, level),NA))
 
