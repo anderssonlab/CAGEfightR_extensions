@@ -74,7 +74,7 @@ quantifyClustersOlap <- function(object, clusters, inputAssay) {
     max.nr <- max(sapply(revmap, length))
     ids <- lapply(1:max.nr, function(level) setdiff(sapply(revmap, `[`, level),NA))
 
-    res <- bplapply(1:max.nr, function(i) {
+    res <- BiocParallel::bplapply(1:max.nr, function(i) {
         clu <- clusters[ids[[i]]]
         obj <- object
         seqinfo(obj) <- seqinfo(clu)
