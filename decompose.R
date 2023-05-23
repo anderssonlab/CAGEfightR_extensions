@@ -1,7 +1,6 @@
 require("CAGEfightR")
 require("assertthat")
 require("caTools")
-require("psych")
 require("bcp")
 
 source("CAGEfightR_extensions/utils.R")
@@ -14,7 +13,7 @@ decomposeCorr <- function(object, ctss, fn=corr_decompose, ...) {
     assert_that(identical(seqlengths(object), seqlengths(ctss)))
 
     ## Split by strand
-    message("Splitting by strand...")
+    message("Splitting and intersecting data...")
     TCsByStrand <- splitByStrand(object)
     covByStrand <- splitPooled(methods::as(rowRanges(ctss),"GRanges"))
     ctssByStrand <- splitByStrand(ctss)
@@ -31,6 +30,9 @@ decomposeCorr <- function(object, ctss, fn=corr_decompose, ...) {
     irl_plus <- methods::as(lapply(seq_along(ctss_plus), function(i) fn(ctss_plus[[i]], grl_plus[[i]], ...)),"IRangesList")
     irl_minus <- methods::as(lapply(seq_along(ctss_minus), function(i) fn(ctss_minus[[i]], grl_minus[[i]], ...)),"IRangesList")
 
+    names(irl_plus) <- names(grl_plus)
+    names(irl_minus) <- names(grl_minus)
+    
     message("Quantifying decomposed tag clusters...")
     decomposedTCs <- TCstats(coverage_plus = covByStrand$`+`,
                              coverage_minus = covByStrand$`-`,
