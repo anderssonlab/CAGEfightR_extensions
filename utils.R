@@ -6,15 +6,15 @@ calcNumberCTSSs <- function(object, inputAssay = "counts", outputColumn = "numbe
                 inputAssay %in% assayNames(object),
                 is.string(inputAssay),
                 is.string(outputColumn))
-    
+
     if (outputColumn %in% colnames(colData(object))) {
         warning("object already has a column named ", outputColumn, " in colData: It will be overwritten!")
     }
-    
+
     ## Calculate number of unique CTSS positions
     a <- assay(object, inputAssay)
     colData(object)[, outputColumn] <- sapply(colnames(a), function(i) sum(a[,i]>unexpressed))
-    
+
     ## Return
     object
 }
@@ -26,19 +26,19 @@ calcNumberGenes <- function(object, txModels, inputAssay = "counts", outputColum
                 inputAssay %in% assayNames(object),
                 is.string(inputAssay),
                 is.string(outputColumn))
-    
+
     if (outputColumn %in% colnames(colData(object))) {
         warning("object already has a column named ", outputColumn, " in colData: It will be overwritten!")
     }
-    
+
     if (!"geneID" %in% colnames(mcols(object)))
         object <- assignGeneID(object, geneModels = txModels, outputColumn = "geneID")
     genelevel <- quantifyGenes(object, genes="geneID", inputAssay=inputAssay)
-    
+
     ## Calculate number of expressed genes
     a <- assay(genelevel, inputAssay)
     colData(object)[, outputColumn] <- sapply(colnames(a), function(i) sum(a[,i]>unexpressed))
-    
+
     ## Return
     object
 }
@@ -50,11 +50,11 @@ calcNumberDivergentLoci <- function(object, loci, inputAssay="counts", outputCol
                 inputAssay %in% assayNames(object),
                 is.string(inputAssay),
                 is.string(outputColumn))
-    
+
     if (outputColumn %in% colnames(colData(object))) {
         warning("object already has a column named ", outputColumn, " in colData: It will be overwritten!")
     }
-    
+
     ## Calculate number of expressed loci
     res <- quantifyStrandwiseDivergentLoci(loci, object, inputAssay=inputAssay)
     m <- assay(res$'-', inputAssay)
@@ -63,52 +63,135 @@ calcNumberDivergentLoci <- function(object, loci, inputAssay="counts", outputCol
     if (requirebidirectional)
         expressed <- expressed & sapply(colnames(m), function(i) m[,i]>0 & p[,i]>0)
     colData(object)[, outputColumn] <- colSums(expressed)
-    
+
     ## Return
     object
 }
 
-## loci: GRanges
-## ctss: RangedSummarisedExperiment
-quantifyStrandwiseDivergentLoci <- function(loci, ctss, inputAssay="counts") {
-    win_1 <- loci
-    end(win_1) <- start(loci$thick)-1
-    strand(win_1) <- "-"
-    
-    win_2 <- loci
-    start(win_2) <- start(loci$thick)+1
-    strand(win_2) <- "+"
+quantifyClustersOlap <- function(object, clusters, inputAssay) {
 
-    m1 <- assay(quantifyClusters(ctss, win_1, inputAssay = inputAssay),inputAssay)
-    m2 <- assay(quantifyClusters(ctss, win_2, inputAssay = inputAssay),inputAssay)
+    revmap <- GenomicRanges::reduce(clusters, with.revmap=TRUE)$revmap
+    max.nr <- max(sapply(revmap, length))
+    ids <- lapply(1:max.nr, function(level) setdiff(sapply(revmap, `[`, level),NA))
 
-	m <- SummarizedExperiment(assays = SimpleList(m1),
-                              rowRanges = loci,
-                              colData = colData(ctss))
-    assayNames(m) <- inputAssay
-	p <- SummarizedExperiment(assays = SimpleList(m2),
-                              rowRanges = loci,
-                              colData = colData(ctss))
-    assayNames(p) <- inputAssay
-    
-	res <- list(m,p)
-	names(res) <- c("-","+")
+    res <- BiocParallel::bplapply(1:max.nr, function(i) {
+        clu <- clusters[ids[[i]]]
+        obj <- object
+        seqinfo(obj) <- seqinfo(clu)
 
-    res
+        ##special case, CAGEfightR::quantifyClusters does not deal with granges objects of length 1
+        spec <- FALSE
+        if (length(clu) == 1) {
+            spec <- TRUE
+            clu <- c(clu, shift(clu,width(clu)))
+        }
+
+        suppressMessages(m_ <- CAGEfightR::quantifyClusters(
+                                                object = obj,
+                                                clusters = clu,
+                                                inputAssay = inputAssay
+                                            ))
+        if (spec)
+            m_ <- m_[1]
+        SummarizedExperiment::assays(m_)[[inputAssay]]
+    })
+
+    mat <- do.call("rbind", res)[order(unlist(ids)),]
+
+    rownames(mat) <- names(clusters)
+
+    o <- SummarizedExperiment::SummarizedExperiment(assays = S4Vectors::SimpleList(mat),
+                                                    rowRanges = clusters,
+                                                    colData = SummarizedExperiment::colData(object))
+
+    SummarizedExperiment::assayNames(o) <- inputAssay
+
+    o
 }
 
 ## loci: GRanges
 ## ctss: RangedSummarisedExperiment
-quantifyDivergentLoci <- function(loci, ctss, inputAssay="counts") {
+quantifyStrandwiseDivergentLoci <- function(loci, ctss, inputAssay = "counts", requireDisjoint=TRUE) {
+  win_1 <- loci
+  BiocGenerics::end(win_1) <- start(loci$thick) - 1
+  BiocGenerics::strand(win_1) <- "-"
 
-	res <- quantifyStrandwiseDivergentLoci(loci, ctss, inputAssay)
-	
-    o <- SummarizedExperiment(assays = SimpleList(assay(res$'-',inputAssay) + assay(res$'+',inputAssay)),
-                              rowRanges = loci,
-                              colData = colData(ctss))
-    assayNames(o) <- inputAssay
-    
-    o
+  win_2 <- loci
+  BiocGenerics::start(win_2) <- start(loci$thick) + 1
+  BiocGenerics::strand(win_2) <- "+"
+
+  m1 <- matrix()
+  if (!requireDisjoint && !isDisjoint(win_1)) {
+      m1_ <- quantifyClustersOlap(
+          object = ctss,
+          clusters = win_1,
+          inputAssay = inputAssay
+      )
+      m1 <- SummarizedExperiment::assays(m1_)[[inputAssay]]
+  }
+  else {
+      m1_ <- CAGEfightR::quantifyClusters(
+                             object = ctss,
+                             clusters = win_1,
+                             inputAssay = inputAssay
+                         )
+      m1 <- SummarizedExperiment::assays(m1_)[[inputAssay]]
+  }
+
+  m2 <- matrix()
+  if (!requireDisjoint && !isDisjoint(win_2)) {
+      m2_ <- quantifyClustersOlap(
+          object = ctss,
+          clusters = win_2,
+          inputAssay = inputAssay
+      )
+      m2 <- SummarizedExperiment::assays(m1_)[[inputAssay]]
+  }
+  else {
+      m2_ <- CAGEfightR::quantifyClusters(
+                             object = ctss,
+                             clusters = win_2,
+                             inputAssay = inputAssay
+                         )
+      m2 <- SummarizedExperiment::assays(m2_)[[inputAssay]]
+  }
+
+  m <- SummarizedExperiment::SummarizedExperiment(
+    assays = S4Vectors::SimpleList(m1),
+    rowRanges = loci,
+    colData = SummarizedExperiment::colData(ctss)
+  )
+  SummarizedExperiment::assayNames(m) <- inputAssay
+  p <- SummarizedExperiment::SummarizedExperiment(
+    assays = S4Vectors::SimpleList(m2),
+    rowRanges = loci,
+    colData = SummarizedExperiment::colData(ctss)
+  )
+  SummarizedExperiment::assayNames(p) <- inputAssay
+
+  res <- base::list(m,p)
+  base::names(res) <- c("-","+")
+
+  res
+}
+
+## loci: GRanges
+## ctss: RangedSummarisedExperiment
+quantifyDivergentLoci <- function(loci, ctss, inputAssay="counts", requireDisjoint=TRUE) {
+
+  res <- quantifyStrandwiseDivergentLoci(loci, ctss, inputAssay, requireDisjoint)
+
+  o <- SummarizedExperiment::SummarizedExperiment(
+    assays = S4Vectors::SimpleList(
+      SummarizedExperiment::assays(res$'-')[[inputAssay]] +
+        SummarizedExperiment::assays(res$'+')[[inputAssay]]
+    ),
+    rowRanges = loci,
+    colData = SummarizedExperiment::colData(ctss)
+  )
+  SummarizedExperiment::assayNames(o) <- inputAssay
+
+  o
 }
 
 ## nonzero function from the DAPAR package (https://rdrr.io/bioc/DAPAR/src/R/utils.R)
