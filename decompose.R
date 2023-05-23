@@ -1,8 +1,54 @@
 require("CAGEfightR")
 require("assertthat")
 require("caTools")
+require("psych")
+require("bcp")
 
 source("CAGEfightR_extensions/utils.R")
+
+## Decompose tag clusters according to sample correlations
+## object: GRanges
+## ctss: RangedSummarizedExperiment
+decomposeCorr <- function(object, ctss, fn=corr_decompose, ...) {
+
+    assert_that(identical(seqlengths(object), seqlengths(ctss)))
+
+    ## Split by strand
+    message("Splitting by strand...")
+    TCsByStrand <- splitByStrand(object)
+    covByStrand <- splitPooled(methods::as(rowRanges(ctss),"GRanges"))
+    ctssByStrand <- splitByStrand(ctss)
+
+    ## Convert TCs to GRangesList split by chromosome
+    grl_plus <- methods::as(split(TCsByStrand$`+`, seqnames(TCsByStrand$`+`)),'GRangesList')
+    grl_minus <- methods::as(split(TCsByStrand$`-`, seqnames(TCsByStrand$`-`)),'GRangesList')
+
+    ## Create CTSS intersects
+    ctss_plus <- lapply(grl_plus, function(gr) subsetByOverlaps(ctssByStrand$`+`, gr))
+    ctss_minus <- lapply(grl_minus, function(gr) subsetByOverlaps(ctssByStrand$`-`, gr))
+
+    message("Decomposing tag clusters")
+    irl_plus <- methods::as(lapply(seq_along(ctss_plus), function(i) fn(ctss_plus[[i]], grl_plus[[i]], ...)),"IRangesList")
+    irl_minus <- methods::as(lapply(seq_along(ctss_minus), function(i) fn(ctss_minus[[i]], grl_minus[[i]], ...)),"IRangesList")
+
+    message("Quantifying decomposed tag clusters...")
+    decomposedTCs <- TCstats(coverage_plus = covByStrand$`+`,
+                             coverage_minus = covByStrand$`-`,
+                             tcs_plus = methods::as(irl_plus,"CompressedIRangesList"),
+                             tcs_minus = methods::as(irl_minus,"CompressedIRangesList"))
+
+    ## Carry over seqinfo and sort
+    message("Preparing output...")
+    seqinfo(decomposedTCs) <- seqinfo(object)
+    decomposedTCs <- sort(decomposedTCs)
+
+    ## Print some basic stats
+    message("Tag clustering summary:")
+    summarizeWidths(decomposedTCs)
+
+    ## Return
+    decomposedTCs
+}
 
 ## Decomposes tag clusters according to pooled values and a decomposition function
 ## (implemented functions: summit_decompose and local_maxima_decompose)
@@ -93,6 +139,76 @@ summit_decompose <- function(views, fraction = 0.1, mergeDist=20) {
     pos <- matrix(unlist(lapply(1:length(views), function(i) {x <- pos[[i]]; lapply(seq(1,length(x),by=2), function(j) c(i,x[j],x[j+1]))})),ncol=3,byrow=TRUE)
 
     s <- start(views)[pos[,1]]
+
+    ## return IRanges object
+    IRanges(start=pos[,2]+s-1,end=pos[,3]+s-1)
+}
+
+
+corr_decompose <- function(rse, gr, assay="TPM", thres=0.25) {
+
+    if (length(rse)==0)
+        return(IRanges())
+
+    fo <- findOverlaps(rse, gr)
+    hits <- sort(unique(subjectHits(fo)))
+
+    assert_that(length(hits) == length(gr))
+
+    pos <- bplapply(hits, function(i) {
+
+        q <- queryHits(fo)[which(subjectHits(fo) == i)]
+
+        ## most common case: 1bp TC
+        if (length(q) == 1)
+            return(c(1,1))
+
+        g <- gr[i]
+        r <- rse[q]
+
+        mat <- as.matrix(apply(t(assay(r,assay)),2,scale))
+        corr <- cor(mat,method=method)
+        eig <- eigen(corr)$vectors[,1]
+        bcp_eig <- bcp(eig)
+
+        bp <- which(bcp_eig$posterior.prob > thres)
+
+        if (length(bp) == 0)
+            return(c(1,length(q)))
+
+        if (max(bp) == length(q))
+            bp <- bp[-length(bp)]
+
+        if (length(bp) == 0)
+            return(c(1,length(q)))
+
+        splitAt <- function(x, pos) unname(split(x, cumsum(seq_along(x) %in% pos)))
+        spl <- splitAt(1:length(q), bp+1)
+
+        nb.corr <- sapply(1:(length(spl)-1), function(j) mean(corr[spl[[j]],spl[[j+1]]]))
+
+        starts <- sapply(spl, function(x) x[1])
+        ends <- sapply(spl, function(x) x[length(x)])
+
+        ## Merge decomposed clusters if positively correlated
+        if (any(nb.corr > 0)) {
+            keep <- which(nb.corr < 0)
+            starts <- c(starts[1],starts[keep+1])
+            ends <- c(ends[keep],ends[length(ends)])
+        }
+
+        rel.pos <- start(rowRanges(r)) - start(rowRanges(r))[1] + 1
+
+        return(as.vector(matrix(c(rel.pos[starts],rel.pos[ends]),
+                                ncol=length(starts),byrow=TRUE)))
+    })
+
+    pos <- matrix(unlist(lapply(hits, function(i) {
+        x <- pos[[i]]
+        lapply(seq(1,length(x),by=2), function(j) c(i,x[j],x[j+1]))
+    })),ncol=3,byrow=TRUE)
+
+    s <- start(gr)
 
     ## return IRanges object
     IRanges(start=pos[,2]+s-1,end=pos[,3]+s-1)
