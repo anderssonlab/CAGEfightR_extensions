@@ -32,7 +32,7 @@ decomposeCorr <- function(object, ctss, fn=corr_decompose, ...) {
 
     names(irl_plus) <- names(grl_plus)
     names(irl_minus) <- names(grl_minus)
-    
+
     message("Quantifying decomposed tag clusters...")
     decomposedTCs <- TCstats(coverage_plus = covByStrand$`+`,
                              coverage_minus = covByStrand$`-`,
@@ -149,6 +149,8 @@ summit_decompose <- function(views, fraction = 0.1, mergeDist=20) {
 
 corr_decompose <- function(rse, gr, assay="TPM", thres=0.25) {
 
+    splitAt <- function(x, pos) unname(split(x, cumsum(seq_along(x) %in% pos)))
+
     if (length(rse)==0)
         return(IRanges())
 
@@ -169,22 +171,22 @@ corr_decompose <- function(rse, gr, assay="TPM", thres=0.25) {
         r <- rse[q]
 
         mat <- as.matrix(apply(t(assay(r,assay)),2,scale))
-        corr <- cor(mat,method=method)
+        corr <- cor(mat,method="pearson")
         eig <- eigen(corr)$vectors[,1]
         bcp_eig <- bcp(eig)
 
         bp <- which(bcp_eig$posterior.prob > thres)
+        rel.pos <- start(rowRanges(r)) - start(rowRanges(r))[1] + 1
 
         if (length(bp) == 0)
-            return(c(1,length(q)))
+            return(c(1,rel.pos[length(q)]))
 
         if (max(bp) == length(q))
             bp <- bp[-length(bp)]
 
         if (length(bp) == 0)
-            return(c(1,length(q)))
+            return(c(1,rel.pos[length(q)]))
 
-        splitAt <- function(x, pos) unname(split(x, cumsum(seq_along(x) %in% pos)))
         spl <- splitAt(1:length(q), bp+1)
 
         nb.corr <- sapply(1:(length(spl)-1), function(j) mean(corr[spl[[j]],spl[[j+1]]]))
@@ -192,14 +194,14 @@ corr_decompose <- function(rse, gr, assay="TPM", thres=0.25) {
         starts <- sapply(spl, function(x) x[1])
         ends <- sapply(spl, function(x) x[length(x)])
 
-        ## Merge decomposed clusters if positively correlated
-        if (any(nb.corr > 0)) {
-            keep <- which(nb.corr < 0)
-            starts <- c(starts[1],starts[keep+1])
-            ends <- c(ends[keep],ends[length(ends)])
-        }
+        keep <- 1:(length(starts)-1)
 
-        rel.pos <- start(rowRanges(r)) - start(rowRanges(r))[1] + 1
+        ## Merge decomposed clusters if positively correlated
+        if (any(nb.corr > 0))
+            keep <- which(nb.corr < 0)
+
+        starts <- c(starts[1],starts[keep+1])
+        ends <- c(ends[keep],ends[length(ends)])
 
         return(as.vector(matrix(c(rel.pos[starts],rel.pos[ends]),
                                 ncol=length(starts),byrow=TRUE)))
@@ -210,7 +212,7 @@ corr_decompose <- function(rse, gr, assay="TPM", thres=0.25) {
         lapply(seq(1,length(x),by=2), function(j) c(i,x[j],x[j+1]))
     })),ncol=3,byrow=TRUE)
 
-    s <- start(gr)
+    s <- start(gr)[pos[,1]]
 
     ## return IRanges object
     IRanges(start=pos[,2]+s-1,end=pos[,3]+s-1)
