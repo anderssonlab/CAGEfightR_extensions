@@ -147,7 +147,7 @@ summit_decompose <- function(views, fraction = 0.1, mergeDist=20) {
 }
 
 
-corr_decompose <- function(rse, gr, assay="TPM", thres=0.25) {
+corr_decompose <- function(rse, gr, assay="TPM", thres=0.25, merge=TRUE, scale=TRUE) {
 
     splitAt <- function(x, pos) unname(split(x, cumsum(seq_along(x) %in% pos)))
 
@@ -170,7 +170,9 @@ corr_decompose <- function(rse, gr, assay="TPM", thres=0.25) {
         g <- gr[i]
         r <- rse[q]
 
-        mat <- as.matrix(apply(t(assay(r,assay)),2,scale))
+        mat <- as.matrix(t(assay(r,assay)))
+        if (scale)
+            mat <- as.matrix(apply(mat,2,scale))
         corr <- cor(mat,method="pearson")
         eig <- eigen(corr)$vectors[,1]
         bcp_eig <- bcp(eig)
@@ -189,19 +191,20 @@ corr_decompose <- function(rse, gr, assay="TPM", thres=0.25) {
 
         spl <- splitAt(1:length(q), bp+1)
 
-        nb.corr <- sapply(1:(length(spl)-1), function(j) mean(corr[spl[[j]],spl[[j+1]]]))
-
         starts <- sapply(spl, function(x) x[1])
         ends <- sapply(spl, function(x) x[length(x)])
 
-        keep <- 1:(length(starts)-1)
+        if (merge) {
+            nb.corr <- sapply(1:(length(spl)-1), function(j) mean(corr[spl[[j]],spl[[j+1]]]))
+            keep <- 1:(length(starts)-1)
 
-        ## Merge decomposed clusters if positively correlated
-        if (any(nb.corr > 0))
-            keep <- which(nb.corr < 0)
+            ## Merge decomposed clusters if positively correlated
+            if (any(nb.corr > 0))
+                keep <- which(nb.corr < 0)
 
-        starts <- c(starts[1],starts[keep+1])
-        ends <- c(ends[keep],ends[length(ends)])
+            starts <- c(starts[1],starts[keep+1])
+            ends <- c(ends[keep],ends[length(ends)])
+        }
 
         return(as.vector(matrix(c(rel.pos[starts],rel.pos[ends]),
                                 ncol=length(starts),byrow=TRUE)))
