@@ -1,5 +1,7 @@
 # CAGEfightR_extensions
 
+This repo is not being developed further and has been replaced by https://github.com/anderssonlab/PRIME.
+
 R functions for 
 
 * calling enhancers from CAGE data in the same way that was done in Andersson et al, 2014, Nature (https://doi.org/10.1038/nature12787)
